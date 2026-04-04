@@ -18,6 +18,17 @@
 ./dataset/case001/nipple_x.txt   # [x1,x2,x3]
 ```
 
+也支持切片目录格式（你现在这个格式）：
+
+```
+./dataset/case001/input1/slice_0001.jpg
+./dataset/case001/input2/slice_0001.jpg
+./dataset/case001/input3/slice_0001.jpg
+./dataset/case001/nipple_x.txt
+```
+
+程序会优先按同名 `slice_xxx` 对齐，不同名时按排序后一一配对。
+
 ## 训练（两步）
 
 ```bash

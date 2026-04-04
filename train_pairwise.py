@@ -12,6 +12,11 @@ from abus_pairwise.pipeline import LossWeights, TwoStageStitcher, compute_total_
 
 def train_stage(args: argparse.Namespace, stage: str, model: TwoStageStitcher, device: torch.device) -> None:
     ds = ABUSPairDataset(args.dataset_root, stage=stage, image_size=args.image_size)
+    if len(ds) == 0:
+        raise RuntimeError(
+            f"No training samples found for stage={stage} under {args.dataset_root}. "
+            "Supported layouts: case/inputX.jpg or case/inputX/slice_xxx.jpg."
+        )
     dl = DataLoader(ds, batch_size=args.batch_size, shuffle=True, num_workers=2)
 
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -45,6 +50,8 @@ def train_stage(args: argparse.Namespace, stage: str, model: TwoStageStitcher, d
 def export_samples(args: argparse.Namespace, stage: str, model: TwoStageStitcher, device: torch.device) -> None:
     model.eval()
     ds = ABUSPairDataset(args.dataset_root, stage=stage, image_size=args.image_size)
+    if len(ds) == 0:
+        return
     dl = DataLoader(ds, batch_size=1, shuffle=False)
 
     with torch.no_grad():
