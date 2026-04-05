@@ -40,7 +40,8 @@ def train_stage(args: argparse.Namespace, stage: str, model: TwoStageStitcher, d
         print(
             f"[{stage}] epoch={epoch+1}/{args.epochs} "
             f"total={losses['total'].item():.4f} warp={losses['warp_align'].item():.4f} "
-            f"nipple={losses['nipple_prior'].item():.4f} xheat={losses['x_heat'].item():.4f}"
+            f"feat={losses['feature_align'].item():.4f} nipple={losses['nipple_prior'].item():.4f} "
+            f"xheat={losses['x_heat'].item():.4f}"
         )
 
     ckpt = Path(args.out_dir) / f"stage_{stage}.pt"

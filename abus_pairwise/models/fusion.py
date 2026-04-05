@@ -54,8 +54,16 @@ class SoftSeamFusionUNet(nn.Module):
             up1 = F.interpolate(up1, size=e1.shape[-2:], mode="bilinear", align_corners=False)
         d1 = self.d1(torch.cat([up1, e1], dim=1))
 
-        m_right = torch.sigmoid(self.mask_head(d1))
-        m_left = 1.0 - m_right
+        raw_right = torch.sigmoid(self.mask_head(d1))
+        valid_left = (left_warp.sum(1, keepdim=True) > 0).float()
+        valid_right = (right_warp.sum(1, keepdim=True) > 0).float()
+
+        # Constrain masks by valid support, then renormalize.
+        m_right = raw_right * valid_right
+        m_left = (1.0 - raw_right) * valid_left
+        norm = (m_left + m_right).clamp_min(1e-6)
+        m_left = m_left / norm
+        m_right = m_right / norm
         stitched = m_left * left_warp + m_right * right_warp
 
         return {

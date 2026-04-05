@@ -8,6 +8,7 @@
 并将原始深度先验/损失替换为 **乳头 x 坐标强先验**：
 - `nipple_prior_loss`：约束预测全局平移与 `(x_right - x_left)` 对齐
 - `x_heatmap_similarity_loss`：只基于 x 坐标构建热图，强调乳头周围区域拼接相似性
+- 乳头 x 监督加入 ±20 像素容忍区间，优先由重叠区特征对齐损失（NCC）驱动
 
 ## 数据格式
 
@@ -40,9 +41,8 @@ python train_pairwise.py --dataset-root ./dataset --out-dir ./outputs
 - 第二步 `input2 + input3` (`stage=23`)
 
 每一步都会保存：
-- warp 后图像
-- fusion 结果
-- mask
+- `warp/`：warp 后 left/right 图像
+- `fusion/`：融合结果 + soft mask + 二值 mask（每张图像保留区域）
 
 默认会根据 warp 后有效区域（重叠+非重叠并集）自动裁剪输出，因此每个 case 的输出尺寸可以不同，不再固定为 512×512。
 如果你希望保留原始切片分辨率，不要 resize，设置：

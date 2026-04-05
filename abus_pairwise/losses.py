@@ -21,9 +21,34 @@ def warp_alignment_loss(left_warp: torch.Tensor, right_warp: torch.Tensor, overl
 
 
 def nipple_prior_loss(global_shift_x: torch.Tensor, left_x: torch.Tensor, right_x: torch.Tensor) -> torch.Tensor:
-    """Force predicted shift to align left nipple x to right nipple x."""
+    """
+    Force predicted shift to align left nipple x to right nipple x, but allow
+    tolerance (default ±20 px) because annotation can be noisy.
+    """
     target_shift = right_x - left_x
-    return F.smooth_l1_loss(global_shift_x, target_shift)
+    err = (global_shift_x - target_shift).abs()
+    tol = 20.0
+    # Within tolerance -> 0 loss, outside tolerance -> penalize extra distance.
+    return F.smooth_l1_loss(torch.relu(err - tol), torch.zeros_like(err))
+
+
+def overlap_ncc_loss(left_warp: torch.Tensor, right_warp: torch.Tensor, overlap: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+    """
+    Feature-first alignment in overlap region using local normalized cross-correlation proxy
+    on grayscale intensity; maximize similarity => minimize (1 - ncc).
+    """
+    l = left_warp.mean(1, keepdim=True)
+    r = right_warp.mean(1, keepdim=True)
+    w = overlap
+    denom = w.sum(dim=(2, 3), keepdim=True).clamp_min(1.0)
+    l_mu = (l * w).sum(dim=(2, 3), keepdim=True) / denom
+    r_mu = (r * w).sum(dim=(2, 3), keepdim=True) / denom
+    l_z = (l - l_mu) * w
+    r_z = (r - r_mu) * w
+    num = (l_z * r_z).sum(dim=(2, 3))
+    den = torch.sqrt((l_z.square().sum(dim=(2, 3)) + eps) * (r_z.square().sum(dim=(2, 3)) + eps))
+    ncc = num / den
+    return (1.0 - ncc).mean()
 
 
 def x_heatmap_similarity_loss(

@@ -36,7 +36,10 @@ def test_save_stage_results_with_auto_crop(tmp_path: Path):
     with torch.no_grad():
         out = model(left, right)
     save_stage_results_with_crop(out, tmp_path, prefix="demo", auto_crop=True)
-    assert (tmp_path / "demo_fusion.png").exists()
+    assert (tmp_path / "warp" / "demo_left.png").exists()
+    assert (tmp_path / "fusion" / "demo_stitched.png").exists()
+    assert (tmp_path / "fusion" / "demo_mask_left_bin.png").exists()
+    assert (tmp_path / "fusion" / "demo_mask_right_bin.png").exists()
 
 
 def test_two_stage_forward_with_odd_resolution():

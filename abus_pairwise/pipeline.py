@@ -9,6 +9,7 @@ from torchvision.utils import save_image
 from .losses import (
     fusion_regularization,
     nipple_prior_loss,
+    overlap_ncc_loss,
     warp_alignment_loss,
     x_heatmap_similarity_loss,
 )
@@ -19,7 +20,8 @@ from .models.warp import WarpStage
 @dataclass
 class LossWeights:
     warp_align: float = 1.0
-    nipple_prior: float = 2.0
+    feature_align: float = 2.0
+    nipple_prior: float = 0.5
     x_heat: float = 1.0
     mask_tv: float = 0.05
 
@@ -38,6 +40,7 @@ class TwoStageStitcher(torch.nn.Module):
 
 def compute_total_loss(outputs: dict[str, torch.Tensor], left_x: torch.Tensor, right_x: torch.Tensor, w: LossWeights) -> dict[str, torch.Tensor]:
     l_warp = warp_alignment_loss(outputs["left_warp"], outputs["right_warp"], outputs["overlap"])
+    l_feat = overlap_ncc_loss(outputs["left_warp"], outputs["right_warp"], outputs["overlap"])
     l_nipple = nipple_prior_loss(outputs["global_shift_x"], left_x, right_x)
     l_xh = x_heatmap_similarity_loss(
         outputs["stitched"],
@@ -48,10 +51,17 @@ def compute_total_loss(outputs: dict[str, torch.Tensor], left_x: torch.Tensor, r
     )
     l_tv = fusion_regularization(outputs["mask_right"])
 
-    total = w.warp_align * l_warp + w.nipple_prior * l_nipple + w.x_heat * l_xh + w.mask_tv * l_tv
+    total = (
+        w.warp_align * l_warp
+        + w.feature_align * l_feat
+        + w.nipple_prior * l_nipple
+        + w.x_heat * l_xh
+        + w.mask_tv * l_tv
+    )
     return {
         "total": total,
         "warp_align": l_warp,
+        "feature_align": l_feat,
         "nipple_prior": l_nipple,
         "x_heat": l_xh,
         "mask_tv": l_tv,
@@ -91,7 +101,10 @@ def save_stage_results_with_crop(
     auto_crop: bool = True,
 ) -> None:
     out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    warp_dir = out_dir / "warp"
+    fusion_dir = out_dir / "fusion"
+    warp_dir.mkdir(parents=True, exist_ok=True)
+    fusion_dir.mkdir(parents=True, exist_ok=True)
 
     left = outputs["left_warp"].detach().cpu()
     right = outputs["right_warp"].detach().cpu()
@@ -109,7 +122,14 @@ def save_stage_results_with_crop(
         stitched = stitched[:, :, y1:y2, x1:x2]
         mask_right = mask_right[:, :, y1:y2, x1:x2]
 
-    save_image(left, out_dir / f"{prefix}_warp_left.png")
-    save_image(right, out_dir / f"{prefix}_warp_right.png")
-    save_image(stitched, out_dir / f"{prefix}_fusion.png")
-    save_image(mask_right, out_dir / f"{prefix}_mask_right.png")
+    mask_left = 1.0 - mask_right
+    bin_left = (mask_left > 0.5).float()
+    bin_right = (mask_right > 0.5).float()
+
+    save_image(left, warp_dir / f"{prefix}_left.png")
+    save_image(right, warp_dir / f"{prefix}_right.png")
+    save_image(stitched, fusion_dir / f"{prefix}_stitched.png")
+    save_image(mask_left, fusion_dir / f"{prefix}_mask_left_soft.png")
+    save_image(mask_right, fusion_dir / f"{prefix}_mask_right_soft.png")
+    save_image(bin_left, fusion_dir / f"{prefix}_mask_left_bin.png")
+    save_image(bin_right, fusion_dir / f"{prefix}_mask_right_bin.png")
