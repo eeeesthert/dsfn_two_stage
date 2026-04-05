@@ -11,7 +11,8 @@ from abus_pairwise.pipeline import LossWeights, TwoStageStitcher, compute_total_
 
 
 def train_stage(args: argparse.Namespace, stage: str, model: TwoStageStitcher, device: torch.device) -> None:
-    ds = ABUSPairDataset(args.dataset_root, stage=stage, image_size=args.image_size)
+    img_size = None if args.image_size <= 0 else args.image_size
+    ds = ABUSPairDataset(args.dataset_root, stage=stage, image_size=img_size)
     if len(ds) == 0:
         raise RuntimeError(
             f"No training samples found for stage={stage} under {args.dataset_root}. "
@@ -49,7 +50,8 @@ def train_stage(args: argparse.Namespace, stage: str, model: TwoStageStitcher, d
 
 def export_samples(args: argparse.Namespace, stage: str, model: TwoStageStitcher, device: torch.device) -> None:
     model.eval()
-    ds = ABUSPairDataset(args.dataset_root, stage=stage, image_size=args.image_size)
+    img_size = None if args.image_size <= 0 else args.image_size
+    ds = ABUSPairDataset(args.dataset_root, stage=stage, image_size=img_size)
     if len(ds) == 0:
         return
     dl = DataLoader(ds, batch_size=1, shuffle=False)
@@ -69,7 +71,7 @@ def main() -> None:
     ap.add_argument("--out-dir", default="./outputs")
     ap.add_argument("--epochs", type=int, default=20)
     ap.add_argument("--batch-size", type=int, default=2)
-    ap.add_argument("--image-size", type=int, default=512)
+    ap.add_argument("--image-size", type=int, default=512, help="set <=0 to keep original slice size")
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--cpu", action="store_true")
     args = ap.parse_args()

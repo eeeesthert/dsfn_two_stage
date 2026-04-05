@@ -59,10 +59,57 @@ def compute_total_loss(outputs: dict[str, torch.Tensor], left_x: torch.Tensor, r
 
 
 def save_stage_results(outputs: dict[str, torch.Tensor], out_dir: str | Path, prefix: str) -> None:
+    save_stage_results_with_crop(outputs, out_dir, prefix, auto_crop=True)
+
+
+def _bbox_from_valid(valid: torch.Tensor, min_size: int = 8) -> tuple[int, int, int, int]:
+    """
+    valid: (1, 1, H, W) binary mask.
+    Returns y1, y2, x1, x2 (inclusive-exclusive).
+    """
+    ys, xs = torch.where(valid[0, 0] > 0)
+    h, w = valid.shape[-2:]
+    if ys.numel() == 0:
+        return 0, h, 0, w
+    y1, y2 = int(ys.min().item()), int(ys.max().item()) + 1
+    x1, x2 = int(xs.min().item()), int(xs.max().item()) + 1
+    if (y2 - y1) < min_size:
+        yc = (y1 + y2) // 2
+        y1 = max(0, yc - min_size // 2)
+        y2 = min(h, y1 + min_size)
+    if (x2 - x1) < min_size:
+        xc = (x1 + x2) // 2
+        x1 = max(0, xc - min_size // 2)
+        x2 = min(w, x1 + min_size)
+    return y1, y2, x1, x2
+
+
+def save_stage_results_with_crop(
+    outputs: dict[str, torch.Tensor],
+    out_dir: str | Path,
+    prefix: str,
+    auto_crop: bool = True,
+) -> None:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    save_image(outputs["left_warp"].cpu(), out_dir / f"{prefix}_warp_left.png")
-    save_image(outputs["right_warp"].cpu(), out_dir / f"{prefix}_warp_right.png")
-    save_image(outputs["stitched"].cpu(), out_dir / f"{prefix}_fusion.png")
-    save_image(outputs["mask_right"].cpu(), out_dir / f"{prefix}_mask_right.png")
+    left = outputs["left_warp"].detach().cpu()
+    right = outputs["right_warp"].detach().cpu()
+    stitched = outputs["stitched"].detach().cpu()
+    mask_right = outputs["mask_right"].detach().cpu()
+
+    if auto_crop:
+        valid_left = (left.sum(1, keepdim=True) > 0).float()
+        valid_right = (right.sum(1, keepdim=True) > 0).float()
+        # Use union region (overlap + non-overlap), so output size follows effective stitched content.
+        valid_union = torch.clamp(valid_left + valid_right, 0, 1)
+        y1, y2, x1, x2 = _bbox_from_valid(valid_union)
+        left = left[:, :, y1:y2, x1:x2]
+        right = right[:, :, y1:y2, x1:x2]
+        stitched = stitched[:, :, y1:y2, x1:x2]
+        mask_right = mask_right[:, :, y1:y2, x1:x2]
+
+    save_image(left, out_dir / f"{prefix}_warp_left.png")
+    save_image(right, out_dir / f"{prefix}_warp_right.png")
+    save_image(stitched, out_dir / f"{prefix}_fusion.png")
+    save_image(mask_right, out_dir / f"{prefix}_mask_right.png")

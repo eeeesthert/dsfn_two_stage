@@ -48,3 +48,16 @@ def test_dataset_reads_slice_directory_layout(tmp_path: Path):
     item12 = ds12[0]
     assert float(item12["left_x"][0]) == 11
     assert float(item12["right_x"][0]) == 22
+
+
+def test_dataset_keeps_original_size_when_image_size_none(tmp_path: Path):
+    case = tmp_path / "case001"
+    case.mkdir(parents=True)
+    _write_img(case / "input1.jpg", 64)
+    _write_img(case / "input2.jpg", 128)
+    _write_img(case / "input3.jpg", 192)
+    (case / "nipple_x.txt").write_text("[11,22,33]", encoding="utf-8")
+
+    ds12 = ABUSPairDataset(tmp_path, stage="12", image_size=None)
+    item12 = ds12[0]
+    assert item12["left"].shape == (3, 20, 30)

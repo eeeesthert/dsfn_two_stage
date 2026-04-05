@@ -1,9 +1,10 @@
 import pytest
+from pathlib import Path
 
 torch = pytest.importorskip("torch")
 pytest.importorskip("torchvision")
 
-from abus_pairwise.pipeline import LossWeights, TwoStageStitcher, compute_total_loss
+from abus_pairwise.pipeline import LossWeights, TwoStageStitcher, compute_total_loss, save_stage_results_with_crop
 
 
 def test_two_stage_forward_and_loss_smoke():
@@ -25,3 +26,14 @@ def test_two_stage_forward_and_loss_smoke():
     losses = compute_total_loss(out, left_x, right_x, LossWeights())
     assert "total" in losses
     assert torch.isfinite(losses["total"])
+
+
+def test_save_stage_results_with_auto_crop(tmp_path: Path):
+    model = TwoStageStitcher(pretrained_backbone=False)
+    model.eval()
+    left = torch.rand(1, 3, 64, 64)
+    right = torch.rand(1, 3, 64, 64)
+    with torch.no_grad():
+        out = model(left, right)
+    save_stage_results_with_crop(out, tmp_path, prefix="demo", auto_crop=True)
+    assert (tmp_path / "demo_fusion.png").exists()

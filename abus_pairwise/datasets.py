@@ -25,7 +25,7 @@ class ABUSPairDataset(Dataset):
       dataset/case001/nipple_x.txt   # [x1,x2,x3]
     """
 
-    def __init__(self, root: str | Path, stage: str = "12", image_size: int = 512):
+    def __init__(self, root: str | Path, stage: str = "12", image_size: int | None = 512):
         self.root = Path(root)
         self.stage = stage
         self.image_size = image_size
@@ -107,7 +107,8 @@ class ABUSPairDataset(Dataset):
         if img is None:
             raise FileNotFoundError(p)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = cv2.resize(img, (self.image_size, self.image_size), interpolation=cv2.INTER_LINEAR)
+        if self.image_size is not None and self.image_size > 0:
+            img = cv2.resize(img, (self.image_size, self.image_size), interpolation=cv2.INTER_LINEAR)
         tensor = torch.from_numpy(img).float().permute(2, 0, 1) / 255.0
         return tensor
 

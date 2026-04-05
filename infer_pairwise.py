@@ -10,7 +10,8 @@ from abus_pairwise.pipeline import TwoStageStitcher, save_stage_results
 
 
 def run_stage(model: TwoStageStitcher, dataset_root: str, stage: str, out_dir: str, image_size: int, device: torch.device) -> None:
-    ds = ABUSPairDataset(dataset_root, stage=stage, image_size=image_size)
+    img_size = None if image_size <= 0 else image_size
+    ds = ABUSPairDataset(dataset_root, stage=stage, image_size=img_size)
     model.eval()
 
     with torch.no_grad():
@@ -27,7 +28,7 @@ def main() -> None:
     ap.add_argument("--dataset-root", default="./dataset")
     ap.add_argument("--checkpoint", required=True)
     ap.add_argument("--out-dir", default="./infer_outputs")
-    ap.add_argument("--image-size", type=int, default=512)
+    ap.add_argument("--image-size", type=int, default=512, help="set <=0 to keep original slice size")
     ap.add_argument("--cpu", action="store_true")
     args = ap.parse_args()
 

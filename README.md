@@ -44,11 +44,20 @@ python train_pairwise.py --dataset-root ./dataset --out-dir ./outputs
 - fusion 结果
 - mask
 
+默认会根据 warp 后有效区域（重叠+非重叠并集）自动裁剪输出，因此每个 case 的输出尺寸可以不同，不再固定为 512×512。
+如果你希望保留原始切片分辨率，不要 resize，设置：
+
+```bash
+python train_pairwise.py --dataset-root ./dataset --image-size 0
+```
+
 ## 推理
 
 ```bash
 python infer_pairwise.py --dataset-root ./dataset --checkpoint ./outputs/stage_23.pt --out-dir ./infer_outputs
 ```
+
+同样支持 `--image-size 0` 保留输入原始尺寸。
 
 ## 说明
 
