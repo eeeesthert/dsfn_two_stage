@@ -25,20 +25,21 @@ def run_stage(model: TwoStageStitcher, dataset_root: str, stage: str, out_dir: s
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dataset-root", default="./dataset")
-    ap.add_argument("--checkpoint", required=True)
+    ap.add_argument("--dataset-root", default="./infer")
+    ap.add_argument("--stage", default="12", help="23")
+    ap.add_argument("--checkpoint", default = r"./outputs")
     ap.add_argument("--out-dir", default="./infer_outputs")
-    ap.add_argument("--image-size", type=int, default=512, help="set <=0 to keep original slice size")
+    ap.add_argument("--image-size", type=int, default=0, help="set <=0 to keep original slice size")
     ap.add_argument("--cpu", action="store_true")
     args = ap.parse_args()
-
+    
+    ckpt = Path(args.checkpoint) / f"stage_{args.stage}.pt"
     device = torch.device("cpu" if args.cpu or not torch.cuda.is_available() else "cuda")
     model = TwoStageStitcher(pretrained_backbone=False).to(device)
-    model.load_state_dict(torch.load(args.checkpoint, map_location=device), strict=True)
+#     model.load_state_dict(torch.load(args.checkpoint, map_location=device), strict=True)
+    model.load_state_dict(torch.load(ckpt, map_location=device), strict=True)
 
-    run_stage(model, args.dataset_root, stage="12", out_dir=args.out_dir, image_size=args.image_size, device=device)
-    run_stage(model, args.dataset_root, stage="23", out_dir=args.out_dir, image_size=args.image_size, device=device)
-
+    run_stage(model, args.dataset_root, args.stage, out_dir=args.out_dir, image_size=args.image_size, device=device)
 
 if __name__ == "__main__":
     main()
