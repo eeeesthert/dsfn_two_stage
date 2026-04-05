@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class DilatedBlock(nn.Module):
@@ -43,8 +44,15 @@ class SoftSeamFusionUNet(nn.Module):
         e2 = self.e2(self.p1(e1))
         b = self.b(self.p2(e2))
 
-        d2 = self.d2(torch.cat([self.u2(b), e2], dim=1))
-        d1 = self.d1(torch.cat([self.u1(d2), e1], dim=1))
+        up2 = self.u2(b)
+        if up2.shape[-2:] != e2.shape[-2:]:
+            up2 = F.interpolate(up2, size=e2.shape[-2:], mode="bilinear", align_corners=False)
+        d2 = self.d2(torch.cat([up2, e2], dim=1))
+
+        up1 = self.u1(d2)
+        if up1.shape[-2:] != e1.shape[-2:]:
+            up1 = F.interpolate(up1, size=e1.shape[-2:], mode="bilinear", align_corners=False)
+        d1 = self.d1(torch.cat([up1, e1], dim=1))
 
         m_right = torch.sigmoid(self.mask_head(d1))
         m_left = 1.0 - m_right

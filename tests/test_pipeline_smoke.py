@@ -37,3 +37,13 @@ def test_save_stage_results_with_auto_crop(tmp_path: Path):
         out = model(left, right)
     save_stage_results_with_crop(out, tmp_path, prefix="demo", auto_crop=True)
     assert (tmp_path / "demo_fusion.png").exists()
+
+
+def test_two_stage_forward_with_odd_resolution():
+    model = TwoStageStitcher(pretrained_backbone=False)
+    model.eval()
+    left = torch.rand(1, 3, 273, 545)
+    right = torch.rand(1, 3, 273, 545)
+    with torch.no_grad():
+        out = model(left, right)
+    assert out["stitched"].shape[-2:] == (273, 545)

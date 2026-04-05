@@ -36,7 +36,7 @@ def main() -> None:
     ckpt = Path(args.checkpoint) / f"stage_{args.stage}.pt"
     device = torch.device("cpu" if args.cpu or not torch.cuda.is_available() else "cuda")
     model = TwoStageStitcher(pretrained_backbone=False).to(device)
-    model.load_state_dict(torch.load(args.checkpoint, map_location=device), strict=True)
+#     model.load_state_dict(torch.load(args.checkpoint, map_location=device), strict=True)
     model.load_state_dict(torch.load(ckpt, map_location=device), strict=True)
 
     run_stage(model, args.dataset_root, args.stage, out_dir=args.out_dir, image_size=args.image_size, device=device)
