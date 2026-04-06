@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 import torch
@@ -31,9 +32,12 @@ def main() -> None:
     ap.add_argument("--image-size", type=int, default=512, help="set <=0 to keep original slice size")
     ap.add_argument("--encoder-pretrain-source", choices=["imagenet", "radimagenet", "local", "none"], default="imagenet")
     ap.add_argument("--encoder-ckpt", default=None, help="required for radimagenet/local source")
+    ap.add_argument("--radimagenet-url", default=None, help="optional URL for auto-downloading RadImageNet weights")
     ap.add_argument("--encoder-strict-load", action="store_true")
     ap.add_argument("--cpu", action="store_true")
     args = ap.parse_args()
+    if args.radimagenet_url:
+        os.environ["RADIMAGENET_RESNET50_URL"] = args.radimagenet_url
 
     device = torch.device("cpu" if args.cpu or not torch.cuda.is_available() else "cuda")
     model = TwoStageStitcher(
