@@ -2,13 +2,16 @@
 
 本仓库实现了你要求的 **ABUS 两两视图拼接**（先 1-2，再 2-3），按 DSFN 的两阶段思想：
 
-1. **Warp 阶段**：ResNet50 多尺度编码 + 两步回归（全局 x shift + dense flow）
-2. **Fusion 阶段**：dilated conv U-Net 预测 soft seam mask 做融合
+1. **Warp 阶段（两阶段）**：
+   - 阶段1：1/16 特征上做 FCA + RR，回归四顶点偏移，DLT 求粗单应矩阵 \(H_c\)
+   - 阶段2：预测网格控制点位移，使用高斯 RBF 插值连续变形场 \(\Delta\)
+   - 最终 warp：`img ∘ Hc + Δ`
+2. **Fusion 阶段**：dilated conv U-Net，在 skip 连接中引入差分特征，预测 overlap 内 soft seam，并与 warp mask 融合得到最终 mask
 
-并将原始深度先验/损失替换为 **乳头 x 坐标强先验**：
-- `nipple_prior_loss`：约束预测全局平移与 `(x_right - x_left)` 对齐
-- `x_heatmap_similarity_loss`：只基于 x 坐标构建热图，强调乳头周围区域拼接相似性
-- 乳头 x 监督加入 ±20 像素容忍区间，优先由重叠区特征对齐损失（NCC）驱动
+损失函数：
+- Warp 阶段：`overlap_l1_warp_loss`、`grid_edge_length_loss`、`grid_angle_loss`、`nipple_heatmap_alignment_loss`
+- Fusion 阶段：`seam_overlap_boundary_loss`、`seam_cost_loss`、`fusion_smoothness_loss`、`nipple_heatmap_alignment_loss`
+- 优化器：Adam + ExponentialLR
 
 ## 数据格式
 
@@ -36,6 +39,12 @@
 python train_pairwise.py --dataset-root ./dataset --out-dir ./outputs
 ```
 
+可插拔预训练来源（编码器）：
+- `--encoder-pretrain-source imagenet`：ImageNet 预训练（默认）
+- `--encoder-pretrain-source radimagenet --encoder-ckpt /path/to/radimagenet_resnet50.pth`
+- `--encoder-pretrain-source local --encoder-ckpt /path/to/selfsup_checkpoint.pth`
+- `--encoder-pretrain-source none`：随机初始化（不加载预训练）
+
 会依次训练并导出：
 - 第一步 `input1 + input2` (`stage=12`)
 - 第二步 `input2 + input3` (`stage=23`)
@@ -58,6 +67,16 @@ python infer_pairwise.py --dataset-root ./dataset --checkpoint ./outputs/stage_2
 ```
 
 同样支持 `--image-size 0` 保留输入原始尺寸。
+
+如果 checkpoint 是基于本地自监督编码器训练得到，推理时请保持相同编码器来源参数，例如：
+
+```bash
+python infer_pairwise.py \
+  --dataset-root ./dataset \
+  --checkpoint ./outputs/stage_23.pt \
+  --encoder-pretrain-source local \
+  --encoder-ckpt /path/to/selfsup_checkpoint.pth
+```
 
 ## 三视图融合（基于 input2 在 12/23 的 mask）
 

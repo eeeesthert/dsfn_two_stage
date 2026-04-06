@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from abus_pairwise.datasets import ABUSPairDataset
-from abus_pairwise.pipeline import LossWeights, TwoStageStitcher, compute_total_loss, save_stage_results
+from abus_pairwise.pipeline import TwoStageStitcher, compute_total_loss, save_stage_results
 
 
 def train_stage(args: argparse.Namespace, stage: str, model: TwoStageStitcher, device: torch.device) -> None:
@@ -21,7 +21,7 @@ def train_stage(args: argparse.Namespace, stage: str, model: TwoStageStitcher, d
     dl = DataLoader(ds, batch_size=args.batch_size, shuffle=True, num_workers=2)
 
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)
-    lw = LossWeights()
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optim, gamma=0.98)
 
     for epoch in range(args.epochs):
         model.train()
@@ -33,15 +33,16 @@ def train_stage(args: argparse.Namespace, stage: str, model: TwoStageStitcher, d
 
             optim.zero_grad()
             out = model(left, right)
-            losses = compute_total_loss(out, left_x, right_x, lw)
+            losses = compute_total_loss(out, left_x, right_x)
             losses["total"].backward()
             optim.step()
+        scheduler.step()
 
         print(
             f"[{stage}] epoch={epoch+1}/{args.epochs} "
-            f"total={losses['total'].item():.4f} warp={losses['warp_align'].item():.4f} "
-            f"feat={losses['feature_align'].item():.4f} nipple={losses['nipple_prior'].item():.4f} "
-            f"xheat={losses['x_heat'].item():.4f}"
+            f"total={losses['total'].item():.4f} warp_l1={losses['warp_l1'].item():.4f} "
+            f"edge={losses['grid_edge'].item():.4f} angle={losses['grid_angle'].item():.4f} "
+            f"seam={losses['seam_cost'].item():.4f}"
         )
 
     ckpt = Path(args.out_dir) / f"stage_{stage}.pt"
@@ -74,11 +75,18 @@ def main() -> None:
     ap.add_argument("--batch-size", type=int, default=2)
     ap.add_argument("--image-size", type=int, default=512, help="set <=0 to keep original slice size")
     ap.add_argument("--lr", type=float, default=1e-4)
+    ap.add_argument("--encoder-pretrain-source", choices=["imagenet", "radimagenet", "local", "none"], default="imagenet")
+    ap.add_argument("--encoder-ckpt", default=None, help="required for radimagenet/local source")
+    ap.add_argument("--encoder-strict-load", action="store_true")
     ap.add_argument("--cpu", action="store_true")
     args = ap.parse_args()
 
     device = torch.device("cpu" if args.cpu or not torch.cuda.is_available() else "cuda")
-    model = TwoStageStitcher(pretrained_backbone=True).to(device)
+    model = TwoStageStitcher(
+        encoder_pretrain_source=args.encoder_pretrain_source,
+        encoder_ckpt=args.encoder_ckpt,
+        encoder_strict_load=args.encoder_strict_load,
+    ).to(device)
 
     # Step-1: input1 + input2
     train_stage(args, stage="12", model=model, device=device)

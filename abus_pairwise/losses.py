@@ -4,72 +4,104 @@ import torch
 import torch.nn.functional as F
 
 
-def nipple_x_heatmap(x_pos: torch.Tensor, width: int, height: int, sigma: float = 9.0) -> torch.Tensor:
-    """Create 2D heatmap only conditioned on x coordinate (broadcasted over y)."""
+def nipple_x_heatmap(x_pos: torch.Tensor, width: int, height: int, sigma: float = 10.0) -> torch.Tensor:
     b = x_pos.shape[0]
     xs = torch.arange(width, device=x_pos.device).float().view(1, 1, width)
-    x = x_pos.view(b, 1, 1)
-    line = torch.exp(-0.5 * ((xs - x) / sigma) ** 2)
-    hm = line.repeat(1, height, 1).unsqueeze(1)
-    return hm
+    line = torch.exp(-0.5 * ((xs - x_pos.view(b, 1, 1)) / sigma) ** 2)
+    return line.repeat(1, height, 1).unsqueeze(1)
 
 
-def warp_alignment_loss(left_warp: torch.Tensor, right_warp: torch.Tensor, overlap: torch.Tensor) -> torch.Tensor:
+# -----------------------------
+# Warp-stage losses
+# -----------------------------
+def overlap_l1_warp_loss(left_warp: torch.Tensor, right_warp: torch.Tensor, overlap: torch.Tensor) -> torch.Tensor:
     l1 = (left_warp - right_warp).abs() * overlap
-    denom = overlap.sum().clamp_min(1.0)
-    return l1.sum() / denom
+    return l1.sum() / overlap.sum().clamp_min(1.0)
 
 
-def nipple_prior_loss(global_shift_x: torch.Tensor, left_x: torch.Tensor, right_x: torch.Tensor) -> torch.Tensor:
-    """
-    Force predicted shift to align left nipple x to right nipple x, but allow
-    tolerance (default ±20 px) because annotation can be noisy.
-    """
-    target_shift = right_x - left_x
-    err = (global_shift_x - target_shift).abs()
-    tol = 20.0
-    # Within tolerance -> 0 loss, outside tolerance -> penalize extra distance.
-    return F.smooth_l1_loss(torch.relu(err - tol), torch.zeros_like(err))
+def grid_edge_length_loss(control_disp: torch.Tensor) -> torch.Tensor:
+    """Control-grid edge length regularization (avoid over-stretching/compression)."""
+    b, _, gh, gw = control_disp.shape
+    device, dtype = control_disp.device, control_disp.dtype
+    y, x = torch.meshgrid(
+        torch.linspace(-1, 1, gh, device=device, dtype=dtype),
+        torch.linspace(-1, 1, gw, device=device, dtype=dtype),
+        indexing="ij",
+    )
+    base = torch.stack([x, y], dim=0).unsqueeze(0)
+    deformed = base + control_disp
+
+    dx = deformed[:, :, :, 1:] - deformed[:, :, :, :-1]
+    dy = deformed[:, :, 1:, :] - deformed[:, :, :-1, :]
+
+    dx_len = torch.sqrt((dx**2).sum(1) + 1e-6)
+    dy_len = torch.sqrt((dy**2).sum(1) + 1e-6)
+    target_dx = 2.0 / (gw - 1)
+    target_dy = 2.0 / (gh - 1)
+    return (dx_len - target_dx).abs().mean() + (dy_len - target_dy).abs().mean()
 
 
-def overlap_ncc_loss(left_warp: torch.Tensor, right_warp: torch.Tensor, overlap: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
-    """
-    Feature-first alignment in overlap region using local normalized cross-correlation proxy
-    on grayscale intensity; maximize similarity => minimize (1 - ncc).
-    """
-    l = left_warp.mean(1, keepdim=True)
-    r = right_warp.mean(1, keepdim=True)
-    w = overlap
-    denom = w.sum(dim=(2, 3), keepdim=True).clamp_min(1.0)
-    l_mu = (l * w).sum(dim=(2, 3), keepdim=True) / denom
-    r_mu = (r * w).sum(dim=(2, 3), keepdim=True) / denom
-    l_z = (l - l_mu) * w
-    r_z = (r - r_mu) * w
-    num = (l_z * r_z).sum(dim=(2, 3))
-    den = torch.sqrt((l_z.square().sum(dim=(2, 3)) + eps) * (r_z.square().sum(dim=(2, 3)) + eps))
-    ncc = num / den
-    return (1.0 - ncc).mean()
+def grid_angle_loss(control_disp: torch.Tensor) -> torch.Tensor:
+    """Encourage near-right-angle local grid (horizontal vs vertical edge orthogonality)."""
+    b, _, gh, gw = control_disp.shape
+    device, dtype = control_disp.device, control_disp.dtype
+    y, x = torch.meshgrid(
+        torch.linspace(-1, 1, gh, device=device, dtype=dtype),
+        torch.linspace(-1, 1, gw, device=device, dtype=dtype),
+        indexing="ij",
+    )
+    base = torch.stack([x, y], dim=0).unsqueeze(0)
+    p = base + control_disp
+
+    px = p[:, :, :-1, 1:] - p[:, :, :-1, :-1]
+    py = p[:, :, 1:, :-1] - p[:, :, :-1, :-1]
+
+    dot = (px * py).sum(1)
+    nx = torch.sqrt((px**2).sum(1) + 1e-6)
+    ny = torch.sqrt((py**2).sum(1) + 1e-6)
+    cos = dot / (nx * ny + 1e-6)
+    return cos.abs().mean()
 
 
-def x_heatmap_similarity_loss(
-    stitched: torch.Tensor,
+def nipple_heatmap_alignment_loss(
     left_warp: torch.Tensor,
     right_warp: torch.Tensor,
     left_x: torch.Tensor,
     right_x: torch.Tensor,
 ) -> torch.Tensor:
-    _, _, h, w = stitched.shape
-    hm_left = nipple_x_heatmap(left_x, width=w, height=h)
-    hm_right = nipple_x_heatmap(right_x, width=w, height=h)
-    hm = torch.maximum(hm_left, hm_right)
-
-    # Encourage stitched image to preserve similar local texture near nipple x regions
-    ref = 0.5 * (left_warp + right_warp)
-    diff = (stitched - ref).abs().mean(1, keepdim=True)
+    """Nipple-related supervision via x-only heatmap-weighted local mismatch."""
+    _, _, h, w = left_warp.shape
+    hm = torch.maximum(
+        nipple_x_heatmap(left_x, width=w, height=h),
+        nipple_x_heatmap(right_x, width=w, height=h),
+    )
+    diff = (left_warp - right_warp).abs().mean(1, keepdim=True)
     return (diff * hm).mean()
 
 
-def fusion_regularization(mask_right: torch.Tensor) -> torch.Tensor:
-    dx = (mask_right[:, :, :, 1:] - mask_right[:, :, :, :-1]).abs().mean()
-    dy = (mask_right[:, :, 1:, :] - mask_right[:, :, :-1, :]).abs().mean()
+# -----------------------------
+# Fusion-stage losses
+# -----------------------------
+def seam_overlap_boundary_loss(seam_soft: torch.Tensor, overlap: torch.Tensor) -> torch.Tensor:
+    """Restrict seam inside overlap: penalize seam activation outside overlap."""
+    outside = seam_soft * (1.0 - overlap)
+    return outside.mean()
+
+
+def seam_cost_loss(left_warp: torch.Tensor, right_warp: torch.Tensor, seam_soft: torch.Tensor) -> torch.Tensor:
+    """
+    Push seam toward low-difference regions:
+    cost map = squared difference, weighted by seam gradients.
+    """
+    cost = (left_warp - right_warp).pow(2).mean(1, keepdim=True)
+    gx = (seam_soft[:, :, :, 1:] - seam_soft[:, :, :, :-1]).abs()
+    gy = (seam_soft[:, :, 1:, :] - seam_soft[:, :, :-1, :]).abs()
+    cx = cost[:, :, :, 1:]
+    cy = cost[:, :, 1:, :]
+    return (gx * cx).mean() + (gy * cy).mean()
+
+
+def fusion_smoothness_loss(stitched: torch.Tensor) -> torch.Tensor:
+    dx = (stitched[:, :, :, 1:] - stitched[:, :, :, :-1]).abs().mean()
+    dy = (stitched[:, :, 1:, :] - stitched[:, :, :-1, :]).abs().mean()
     return dx + dy

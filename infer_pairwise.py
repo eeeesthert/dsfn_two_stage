@@ -29,11 +29,18 @@ def main() -> None:
     ap.add_argument("--checkpoint", required=True)
     ap.add_argument("--out-dir", default="./infer_outputs")
     ap.add_argument("--image-size", type=int, default=512, help="set <=0 to keep original slice size")
+    ap.add_argument("--encoder-pretrain-source", choices=["imagenet", "radimagenet", "local", "none"], default="imagenet")
+    ap.add_argument("--encoder-ckpt", default=None, help="required for radimagenet/local source")
+    ap.add_argument("--encoder-strict-load", action="store_true")
     ap.add_argument("--cpu", action="store_true")
     args = ap.parse_args()
 
     device = torch.device("cpu" if args.cpu or not torch.cuda.is_available() else "cuda")
-    model = TwoStageStitcher(pretrained_backbone=False).to(device)
+    model = TwoStageStitcher(
+        encoder_pretrain_source=args.encoder_pretrain_source,
+        encoder_ckpt=args.encoder_ckpt,
+        encoder_strict_load=args.encoder_strict_load,
+    ).to(device)
     model.load_state_dict(torch.load(args.checkpoint, map_location=device), strict=True)
 
     run_stage(model, args.dataset_root, stage="12", out_dir=args.out_dir, image_size=args.image_size, device=device)

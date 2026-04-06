@@ -4,11 +4,11 @@ from pathlib import Path
 torch = pytest.importorskip("torch")
 pytest.importorskip("torchvision")
 
-from abus_pairwise.pipeline import LossWeights, TwoStageStitcher, compute_total_loss, save_stage_results_with_crop
+from abus_pairwise.pipeline import TwoStageStitcher, compute_total_loss, save_stage_results_with_crop
 
 
 def test_two_stage_forward_and_loss_smoke():
-    model = TwoStageStitcher(pretrained_backbone=False)
+    model = TwoStageStitcher(encoder_pretrain_source="none")
     model.eval()
 
     left = torch.rand(1, 3, 64, 64)
@@ -23,13 +23,13 @@ def test_two_stage_forward_and_loss_smoke():
     assert out["stitched"].shape == (1, 3, 64, 64)
     assert out["mask_right"].shape == (1, 1, 64, 64)
 
-    losses = compute_total_loss(out, left_x, right_x, LossWeights())
+    losses = compute_total_loss(out, left_x, right_x)
     assert "total" in losses
     assert torch.isfinite(losses["total"])
 
 
 def test_save_stage_results_with_auto_crop(tmp_path: Path):
-    model = TwoStageStitcher(pretrained_backbone=False)
+    model = TwoStageStitcher(encoder_pretrain_source="none")
     model.eval()
     left = torch.rand(1, 3, 64, 64)
     right = torch.rand(1, 3, 64, 64)
@@ -43,7 +43,7 @@ def test_save_stage_results_with_auto_crop(tmp_path: Path):
 
 
 def test_two_stage_forward_with_odd_resolution():
-    model = TwoStageStitcher(pretrained_backbone=False)
+    model = TwoStageStitcher(encoder_pretrain_source="none")
     model.eval()
     left = torch.rand(1, 3, 273, 545)
     right = torch.rand(1, 3, 273, 545)

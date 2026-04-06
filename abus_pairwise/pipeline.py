@@ -1,35 +1,36 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
 import torch
 from torchvision.utils import save_image
 
 from .losses import (
-    fusion_regularization,
-    nipple_prior_loss,
-    overlap_ncc_loss,
-    warp_alignment_loss,
-    x_heatmap_similarity_loss,
+    fusion_smoothness_loss,
+    grid_angle_loss,
+    grid_edge_length_loss,
+    nipple_heatmap_alignment_loss,
+    overlap_l1_warp_loss,
+    seam_cost_loss,
+    seam_overlap_boundary_loss,
 )
 from .models.fusion import SoftSeamFusionUNet
 from .models.warp import WarpStage
 
 
-@dataclass
-class LossWeights:
-    warp_align: float = 1.0
-    feature_align: float = 2.0
-    nipple_prior: float = 0.5
-    x_heat: float = 1.0
-    mask_tv: float = 0.05
-
-
 class TwoStageStitcher(torch.nn.Module):
-    def __init__(self, pretrained_backbone: bool = True):
+    def __init__(
+        self,
+        encoder_pretrain_source: str = "imagenet",
+        encoder_ckpt: str | None = None,
+        encoder_strict_load: bool = False,
+    ):
         super().__init__()
-        self.warp_net = WarpStage(pretrained=pretrained_backbone)
+        self.warp_net = WarpStage(
+            encoder_pretrain_source=encoder_pretrain_source,
+            encoder_ckpt=encoder_ckpt,
+            encoder_strict_load=encoder_strict_load,
+        )
         self.fusion_net = SoftSeamFusionUNet()
 
     def forward(self, left: torch.Tensor, right: torch.Tensor) -> dict[str, torch.Tensor]:
@@ -38,33 +39,30 @@ class TwoStageStitcher(torch.nn.Module):
         return {**warp_out, **fus_out}
 
 
-def compute_total_loss(outputs: dict[str, torch.Tensor], left_x: torch.Tensor, right_x: torch.Tensor, w: LossWeights) -> dict[str, torch.Tensor]:
-    l_warp = warp_alignment_loss(outputs["left_warp"], outputs["right_warp"], outputs["overlap"])
-    l_feat = overlap_ncc_loss(outputs["left_warp"], outputs["right_warp"], outputs["overlap"])
-    l_nipple = nipple_prior_loss(outputs["global_shift_x"], left_x, right_x)
-    l_xh = x_heatmap_similarity_loss(
-        outputs["stitched"],
-        outputs["left_warp"],
-        outputs["right_warp"],
-        left_x,
-        right_x,
-    )
-    l_tv = fusion_regularization(outputs["mask_right"])
+def compute_total_loss(outputs: dict[str, torch.Tensor], left_x: torch.Tensor, right_x: torch.Tensor) -> dict[str, torch.Tensor]:
+    # Warp-stage losses (4)
+    l_warp_l1 = overlap_l1_warp_loss(outputs["left_warp"], outputs["right_warp"], outputs["overlap"])
+    l_edge = grid_edge_length_loss(outputs["control_disp"])
+    l_angle = grid_angle_loss(outputs["control_disp"])
+    l_nipple_warp = nipple_heatmap_alignment_loss(outputs["left_warp"], outputs["right_warp"], left_x, right_x)
 
-    total = (
-        w.warp_align * l_warp
-        + w.feature_align * l_feat
-        + w.nipple_prior * l_nipple
-        + w.x_heat * l_xh
-        + w.mask_tv * l_tv
-    )
+    # Fusion-stage losses (4)
+    l_boundary = seam_overlap_boundary_loss(outputs["seam_soft"], outputs["overlap"])
+    l_seam_cost = seam_cost_loss(outputs["left_warp"], outputs["right_warp"], outputs["seam_soft"])
+    l_smooth = fusion_smoothness_loss(outputs["stitched"])
+    l_nipple_fus = nipple_heatmap_alignment_loss(outputs["stitched"], outputs["right_warp"], left_x, right_x)
+
+    total = l_warp_l1 + l_edge + l_angle + l_nipple_warp + l_boundary + l_seam_cost + l_smooth + l_nipple_fus
     return {
         "total": total,
-        "warp_align": l_warp,
-        "feature_align": l_feat,
-        "nipple_prior": l_nipple,
-        "x_heat": l_xh,
-        "mask_tv": l_tv,
+        "warp_l1": l_warp_l1,
+        "grid_edge": l_edge,
+        "grid_angle": l_angle,
+        "warp_nipple": l_nipple_warp,
+        "seam_boundary": l_boundary,
+        "seam_cost": l_seam_cost,
+        "fusion_smooth": l_smooth,
+        "fusion_nipple": l_nipple_fus,
     }
 
 
@@ -73,10 +71,6 @@ def save_stage_results(outputs: dict[str, torch.Tensor], out_dir: str | Path, pr
 
 
 def _bbox_from_valid(valid: torch.Tensor, min_size: int = 8) -> tuple[int, int, int, int]:
-    """
-    valid: (1, 1, H, W) binary mask.
-    Returns y1, y2, x1, x2 (inclusive-exclusive).
-    """
     ys, xs = torch.where(valid[0, 0] > 0)
     h, w = valid.shape[-2:]
     if ys.numel() == 0:
@@ -110,17 +104,18 @@ def save_stage_results_with_crop(
     right = outputs["right_warp"].detach().cpu()
     stitched = outputs["stitched"].detach().cpu()
     mask_right = outputs["mask_right"].detach().cpu()
+    seam_soft = outputs["seam_soft"].detach().cpu()
 
     if auto_crop:
         valid_left = (left.sum(1, keepdim=True) > 0).float()
         valid_right = (right.sum(1, keepdim=True) > 0).float()
-        # Use union region (overlap + non-overlap), so output size follows effective stitched content.
         valid_union = torch.clamp(valid_left + valid_right, 0, 1)
         y1, y2, x1, x2 = _bbox_from_valid(valid_union)
         left = left[:, :, y1:y2, x1:x2]
         right = right[:, :, y1:y2, x1:x2]
         stitched = stitched[:, :, y1:y2, x1:x2]
         mask_right = mask_right[:, :, y1:y2, x1:x2]
+        seam_soft = seam_soft[:, :, y1:y2, x1:x2]
 
     mask_left = 1.0 - mask_right
     bin_left = (mask_left > 0.5).float()
@@ -129,6 +124,7 @@ def save_stage_results_with_crop(
     save_image(left, warp_dir / f"{prefix}_left.png")
     save_image(right, warp_dir / f"{prefix}_right.png")
     save_image(stitched, fusion_dir / f"{prefix}_stitched.png")
+    save_image(seam_soft, fusion_dir / f"{prefix}_seam_soft.png")
     save_image(mask_left, fusion_dir / f"{prefix}_mask_left_soft.png")
     save_image(mask_right, fusion_dir / f"{prefix}_mask_right_soft.png")
     save_image(bin_left, fusion_dir / f"{prefix}_mask_left_bin.png")
