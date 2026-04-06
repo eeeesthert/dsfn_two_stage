@@ -59,7 +59,21 @@ python infer_pairwise.py --dataset-root ./dataset --checkpoint ./outputs/stage_2
 
 同样支持 `--image-size 0` 保留输入原始尺寸。
 
+## 三视图融合（基于 input2 在 12/23 的 mask）
+
+有了 `12` 和 `23` 的结果后，可以运行：
+
+```bash
+python fuse_three_view.py --pairwise-root ./outputs/results --out-dir ./outputs/three_view --levels 5 --input2-boost 2.0
+```
+
+融合策略：
+- 读取 stage12/stage23 的 `fusion/*_stitched.png`
+- 使用 `stage12` 的 `mask_right` 和 `stage23` 的 `mask_left` 作为 input2 权重来源
+- 在 input2 的重叠区域（两张 mask 共同高响应处）放大 input2 权重
+- 用高斯/拉普拉斯金字塔进行三图加权融合，输出 `threeview_xxx.png`
+
 ## 说明
 
 - 目前先完成你要求的 **二维两两拼接**。
-- 三视图高斯金字塔融合还没做，但输出里已经保存了 step1/step2 的 mask，可作为后续 input2 重叠区融合先验。
+- 已提供基于 step1/step2 的 input2 mask 的三视图高斯金字塔融合脚本（见上节）。
