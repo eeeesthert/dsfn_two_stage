@@ -45,6 +45,11 @@ python train_pairwise.py --dataset-root ./dataset --out-dir ./outputs
 - `--encoder-pretrain-source local --encoder-ckpt /path/to/selfsup_checkpoint.pth`
 - `--encoder-pretrain-source none`：随机初始化（不加载预训练）
 
+`radimagenet` 支持两种方式：
+1) 显式提供 `--encoder-ckpt` 本地权重；  
+2) 设置环境变量 `RADIMAGENET_RESNET50_URL` 自动下载。  
+若两者都不提供，会自动回退到 ImageNet 权重并提示。
+
 会依次训练并导出：
 - 第一步 `input1 + input2` (`stage=12`)
 - 第二步 `input2 + input3` (`stage=23`)

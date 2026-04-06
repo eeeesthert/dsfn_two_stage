@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -47,18 +48,43 @@ class ResNet50MultiScale(nn.Module):
         if source not in {"imagenet", "radimagenet", "local", "none"}:
             raise ValueError(f"Unsupported pretrain source: {pretrain_source}")
 
-        weights = ResNet50_Weights.IMAGENET1K_V2 if source == "imagenet" else None
+        # ImageNet source can download automatically from torchvision.
+        # For radimagenet, we support optional URL-based auto-download via env var.
+        if source in {"imagenet", "radimagenet"}:
+            weights = ResNet50_Weights.IMAGENET1K_V2
+        else:
+            weights = None
         base = resnet50(weights=weights)
         if source in {"radimagenet", "local"}:
+            if source == "radimagenet" and checkpoint_path is None:
+                url = os.getenv("RADIMAGENET_RESNET50_URL", "").strip()
+                if url:
+                    print(f"[encoder] downloading radimagenet checkpoint from: {url}")
+                    ckpt = torch.hub.load_state_dict_from_url(url, map_location="cpu", progress=True)
+                    sd = _adapt_resnet50_keys(_extract_state_dict(ckpt))
+                    missing, unexpected = base.load_state_dict(sd, strict=strict_load)
+                    if len(unexpected) > 0:
+                        print(f"[encoder] unexpected keys ignored: {len(unexpected)}")
+                    if len(missing) > 0:
+                        print(f"[encoder] missing keys after load: {len(missing)}")
+                    checkpoint_path = "__downloaded__"
+                else:
+                    print(
+                        "[encoder] RADIMAGENET_RESNET50_URL is not set, "
+                        "fallback to torchvision ImageNet weights. "
+                        "Set --encoder-ckpt or env var to use real RadImageNet weights."
+                    )
+                    checkpoint_path = "__imagenet_fallback__"
             if checkpoint_path is None:
                 raise ValueError(f"{source} source requires --encoder-ckpt path.")
-            ckpt = torch.load(Path(checkpoint_path), map_location="cpu")
-            sd = _adapt_resnet50_keys(_extract_state_dict(ckpt))
-            missing, unexpected = base.load_state_dict(sd, strict=strict_load)
-            if len(unexpected) > 0:
-                print(f"[encoder] unexpected keys ignored: {len(unexpected)}")
-            if len(missing) > 0:
-                print(f"[encoder] missing keys after load: {len(missing)}")
+            if checkpoint_path not in {"__downloaded__", "__imagenet_fallback__"}:
+                ckpt = torch.load(Path(checkpoint_path), map_location="cpu")
+                sd = _adapt_resnet50_keys(_extract_state_dict(ckpt))
+                missing, unexpected = base.load_state_dict(sd, strict=strict_load)
+                if len(unexpected) > 0:
+                    print(f"[encoder] unexpected keys ignored: {len(unexpected)}")
+                if len(missing) > 0:
+                    print(f"[encoder] missing keys after load: {len(missing)}")
 
         self.stem = nn.Sequential(base.conv1, base.bn1, base.relu, base.maxpool)
         self.layer1 = base.layer1
