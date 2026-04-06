@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import torch
@@ -35,13 +36,39 @@ class TwoStageStitcher(torch.nn.Module):
         )
         self.fusion_net = SoftSeamFusionUNet()
 
-    def forward(self, left: torch.Tensor, right: torch.Tensor) -> dict[str, torch.Tensor]:
-        warp_out = self.warp_net(left, right)
+    def forward(
+        self,
+        left: torch.Tensor,
+        right: torch.Tensor,
+        left_x: torch.Tensor | None = None,
+        right_x: torch.Tensor | None = None,
+    ) -> dict[str, torch.Tensor]:
+        warp_out = self.warp_net(left, right, left_x=left_x, right_x=right_x)
         fus_out = self.fusion_net(warp_out["left_warp"], warp_out["right_warp"])
         return {**warp_out, **fus_out}
 
 
-def compute_total_loss(outputs: dict[str, torch.Tensor], left_x: torch.Tensor, right_x: torch.Tensor) -> dict[str, torch.Tensor]:
+@dataclass
+class LossWeights:
+    # Recommended defaults when overlap is large.
+    warp_l1: float = 1.0
+    grid_edge: float = 4.0
+    grid_angle: float = 2.0
+    warp_nipple: float = 0.5
+    seam_boundary: float = 1.0
+    seam_cost: float = 2.0
+    fusion_smooth: float = 0.2
+    fusion_nipple: float = 0.5
+
+
+def compute_total_loss(
+    outputs: dict[str, torch.Tensor],
+    left_x: torch.Tensor,
+    right_x: torch.Tensor,
+    w: LossWeights | None = None,
+) -> dict[str, torch.Tensor]:
+    if w is None:
+        w = LossWeights()
     # Warp-stage losses (4)
     l_warp_l1 = overlap_l1_warp_loss(outputs["left_warp"], outputs["right_warp"], outputs["overlap"])
     l_edge = grid_edge_length_loss(outputs["control_disp"])
@@ -54,7 +81,16 @@ def compute_total_loss(outputs: dict[str, torch.Tensor], left_x: torch.Tensor, r
     l_smooth = fusion_smoothness_loss(outputs["stitched"])
     l_nipple_fus = nipple_heatmap_alignment_loss(outputs["stitched"], outputs["right_warp"], left_x, right_x)
 
-    total = l_warp_l1 + l_edge + l_angle + l_nipple_warp + l_boundary + l_seam_cost + l_smooth + l_nipple_fus
+    total = (
+        w.warp_l1 * l_warp_l1
+        + w.grid_edge * l_edge
+        + w.grid_angle * l_angle
+        + w.warp_nipple * l_nipple_warp
+        + w.seam_boundary * l_boundary
+        + w.seam_cost * l_seam_cost
+        + w.fusion_smooth * l_smooth
+        + w.fusion_nipple * l_nipple_fus
+    )
     return {
         "total": total,
         "warp_l1": l_warp_l1,

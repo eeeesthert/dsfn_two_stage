@@ -19,7 +19,9 @@ def run_stage(model: TwoStageStitcher, dataset_root: str, stage: str, out_dir: s
             batch = ds[i]
             left = batch["left"].unsqueeze(0).to(device)
             right = batch["right"].unsqueeze(0).to(device)
-            out = model(left, right)
+            left_x = batch["left_x"].unsqueeze(0).to(device)
+            right_x = batch["right_x"].unsqueeze(0).to(device)
+            out = model(left, right, left_x=left_x, right_x=right_x)
             save_stage_results(out, Path(out_dir) / stage / batch["case"], prefix=f"{stage}_{i:03d}")
 
 

@@ -8,10 +8,13 @@
    - 最终 warp：`img ∘ Hc + Δ`
 2. **Fusion 阶段**：dilated conv U-Net，在 skip 连接中引入差分特征，预测 overlap 内 soft seam，并与 warp mask 融合得到最终 mask
 
+> FOV 说明：fusion 输入使用 warp 输出的扩展画布，不固定为原图宽度；会根据左右乳头 x 位置扩展并重定位，尽量使乳头位于输出 x 中心，同时保留两侧非重叠区域。
+
 损失函数：
 - Warp 阶段：`overlap_l1_warp_loss`、`grid_edge_length_loss`、`grid_angle_loss`、`nipple_heatmap_alignment_loss`
 - Fusion 阶段：`seam_overlap_boundary_loss`、`seam_cost_loss`、`fusion_smoothness_loss`、`nipple_heatmap_alignment_loss`
 - 优化器：Adam + ExponentialLR
+- 默认损失权重（重叠区域较大时推荐）：`warp_l1=1.0, grid_edge=4.0, grid_angle=2.0, warp_nipple=0.5, seam_boundary=1.0, seam_cost=2.0, fusion_smooth=0.2, fusion_nipple=0.5`
 
 ## 数据格式
 

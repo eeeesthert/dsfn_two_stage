@@ -153,7 +153,41 @@ class WarpStage(nn.Module):
         dense = torch.einsum("bpk,bkc->bpc", wgt.repeat(b, 1, 1), disp)
         return dense.view(b, h, w, 2).permute(0, 3, 1, 2)
 
-    def forward(self, left: torch.Tensor, right: torch.Tensor) -> dict[str, torch.Tensor]:
+    @staticmethod
+    def _place_on_canvas(img: torch.Tensor, x_pos: torch.Tensor, out_w: int) -> torch.Tensor:
+        """
+        Re-center image so nipple x is at canvas center.
+        img: (B,C,H,W), x_pos: (B,1) in pixel coordinate of input img.
+        """
+        b, _, h, w = img.shape
+        device, dtype = img.device, img.dtype
+        center = (out_w - 1) / 2.0
+        shift = center - x_pos.view(-1, 1, 1)  # output_x = input_x + shift
+
+        yy, xx = torch.meshgrid(
+            torch.arange(h, device=device, dtype=dtype),
+            torch.arange(out_w, device=device, dtype=dtype),
+            indexing="ij",
+        )
+        xx = xx.unsqueeze(0).repeat(b, 1, 1)
+        yy = yy.unsqueeze(0).repeat(b, 1, 1)
+
+        # inverse map output->input
+        xin = xx - shift
+        yin = yy
+
+        xnorm = 2.0 * xin / max(w - 1, 1) - 1.0
+        ynorm = 2.0 * yin / max(h - 1, 1) - 1.0
+        grid = torch.stack([xnorm, ynorm], dim=-1)
+        return F.grid_sample(img, grid, mode="bilinear", padding_mode="zeros", align_corners=True)
+
+    def forward(
+        self,
+        left: torch.Tensor,
+        right: torch.Tensor,
+        left_x: torch.Tensor | None = None,
+        right_x: torch.Tensor | None = None,
+    ) -> dict[str, torch.Tensor]:
         f_l = self.encoder(left)
         f_r = self.encoder(right)
 
@@ -188,6 +222,18 @@ class WarpStage(nn.Module):
 
         left_w = F.grid_sample(left, final_grid, mode="bilinear", padding_mode="zeros", align_corners=False)
         right_w = right
+
+        # Fusion FOV: expanded canvas with nipple x around output center.
+        if left_x is not None and right_x is not None:
+            _, _, _, w0 = left_w.shape
+            lx = left_x.view(-1, 1).to(left_w.dtype)
+            rx = right_x.view(-1, 1).to(right_w.dtype)
+            # preserve non-overlap on both sides for each view
+            half = torch.maximum(torch.maximum(lx, w0 - lx), torch.maximum(rx, w0 - rx))
+            out_w = int(torch.ceil((half.max() * 2.0) + 8.0).item())
+            out_w = max(out_w, w0)
+            left_w = self._place_on_canvas(left_w, lx, out_w=out_w)
+            right_w = self._place_on_canvas(right_w, rx, out_w=out_w)
         overlap = ((left_w.sum(1, keepdim=True) > 0) & (right_w.sum(1, keepdim=True) > 0)).float()
 
         return {

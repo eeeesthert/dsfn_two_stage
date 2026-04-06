@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from abus_pairwise.datasets import ABUSPairDataset
-from abus_pairwise.pipeline import TwoStageStitcher, compute_total_loss, save_stage_results
+from abus_pairwise.pipeline import LossWeights, TwoStageStitcher, compute_total_loss, save_stage_results
 
 
 def train_stage(args: argparse.Namespace, stage: str, model: TwoStageStitcher, device: torch.device) -> None:
@@ -22,6 +22,7 @@ def train_stage(args: argparse.Namespace, stage: str, model: TwoStageStitcher, d
 
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optim, gamma=0.98)
+    lw = LossWeights()
 
     for epoch in range(args.epochs):
         model.train()
@@ -32,8 +33,8 @@ def train_stage(args: argparse.Namespace, stage: str, model: TwoStageStitcher, d
             right_x = batch["right_x"].to(device)
 
             optim.zero_grad()
-            out = model(left, right)
-            losses = compute_total_loss(out, left_x, right_x)
+            out = model(left, right, left_x=left_x, right_x=right_x)
+            losses = compute_total_loss(out, left_x, right_x, lw)
             losses["total"].backward()
             optim.step()
         scheduler.step()
@@ -62,7 +63,9 @@ def export_samples(args: argparse.Namespace, stage: str, model: TwoStageStitcher
         for i, batch in enumerate(dl):
             left = batch["left"].to(device)
             right = batch["right"].to(device)
-            out = model(left, right)
+            left_x = batch["left_x"].to(device)
+            right_x = batch["right_x"].to(device)
+            out = model(left, right, left_x=left_x, right_x=right_x)
             case = batch["case"][0]
             save_stage_results(out, Path(args.out_dir) / "results" / stage / case, prefix=f"{stage}_{i:03d}")
 
