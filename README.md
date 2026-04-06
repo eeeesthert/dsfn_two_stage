@@ -50,10 +50,16 @@ python train_pairwise.py --dataset-root ./dataset --out-dir ./outputs
 2) 设置环境变量 `RADIMAGENET_RESNET50_URL` 自动下载。  
 若两者都不提供，会自动回退到 ImageNet 权重并提示。
 
-也可以直接在命令行里传（脚本内部会设置环境变量）：
+也可以直接在命令行里传（无需手动设置环境变量）：
 
 ```bash
 python train_pairwise.py --encoder-pretrain-source radimagenet --radimagenet-url https://your-url/radimagenet_resnet50.pth
+```
+
+等价写法（兼容参数名）：
+
+```bash
+python train_pairwise.py --encoder-pretrain-source radimagenet --net-url https://your-url/radimagenet_resnet50.pth
 ```
 
 会依次训练并导出：

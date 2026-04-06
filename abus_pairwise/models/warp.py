@@ -100,6 +100,7 @@ class WarpStage(nn.Module):
         self,
         encoder_pretrain_source: str = "imagenet",
         encoder_ckpt: str | None = None,
+        encoder_radimagenet_url: str | None = None,
         encoder_strict_load: bool = False,
         grid_h: int = 9,
         grid_w: int = 9,
@@ -108,6 +109,7 @@ class WarpStage(nn.Module):
         self.encoder = ResNet50MultiScale(
             pretrain_source=encoder_pretrain_source,
             checkpoint_path=encoder_ckpt,
+            radimagenet_url=encoder_radimagenet_url,
             strict_load=encoder_strict_load,
         )
         self.fca = FCA(c=1024)

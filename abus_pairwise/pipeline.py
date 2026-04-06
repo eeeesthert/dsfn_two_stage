@@ -23,12 +23,14 @@ class TwoStageStitcher(torch.nn.Module):
         self,
         encoder_pretrain_source: str = "imagenet",
         encoder_ckpt: str | None = None,
+        encoder_radimagenet_url: str | None = None,
         encoder_strict_load: bool = False,
     ):
         super().__init__()
         self.warp_net = WarpStage(
             encoder_pretrain_source=encoder_pretrain_source,
             encoder_ckpt=encoder_ckpt,
+            encoder_radimagenet_url=encoder_radimagenet_url,
             encoder_strict_load=encoder_strict_load,
         )
         self.fusion_net = SoftSeamFusionUNet()

@@ -41,6 +41,7 @@ class ResNet50MultiScale(nn.Module):
         self,
         pretrain_source: str = "imagenet",
         checkpoint_path: str | None = None,
+        radimagenet_url: str | None = None,
         strict_load: bool = False,
     ):
         super().__init__()
@@ -57,7 +58,7 @@ class ResNet50MultiScale(nn.Module):
         base = resnet50(weights=weights)
         if source in {"radimagenet", "local"}:
             if source == "radimagenet" and checkpoint_path is None:
-                url = os.getenv("RADIMAGENET_RESNET50_URL", "").strip()
+                url = (radimagenet_url or "").strip() or os.getenv("RADIMAGENET_RESNET50_URL", "").strip()
                 if url:
                     print(f"[encoder] downloading radimagenet checkpoint from: {url}")
                     ckpt = torch.hub.load_state_dict_from_url(url, map_location="cpu", progress=True)
