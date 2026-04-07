@@ -70,10 +70,15 @@ python train_pairwise.py --encoder-pretrain-source radimagenet --radimagenet-url
 python train_pairwise.py --encoder-pretrain-source radimagenet --net-url https://your-url/radimagenet_resnet50.pth
 ```
 
-会依次训练并导出：
-- 第一步 `input1 + input2` (`stage=12`)
-- 第二步 `input2 + input3` (`stage=23`)
+默认使用交叉训练（interleaved）并导出：
+- 每个 epoch 交替优化 `input1 + input2` (`stage=12`) 与 `input2 + input3` (`stage=23`)
 - 两步共享同一套网络参数，训练结束仅保存一个共享 checkpoint（默认 `shared_model.pt`）
+
+如果你想回到“先 12 再 23”的顺序训练，可加：
+
+```bash
+python train_pairwise.py --dataset-root ./dataset --training-schedule sequential
+```
 
 每一步都会保存：
 - `warp/`：warp 后 left/right 图像
