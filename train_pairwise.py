@@ -86,10 +86,18 @@ def train_stage(args: argparse.Namespace, stage: str, model: TwoStageStitcher, d
             bad_epochs += 1
 
         print(
-            f"[{stage}] epoch={epoch+1}/{args.epochs} "
-            f"total={losses['total'].item():.4f} warp_l1={losses['warp_l1'].item():.4f} "
+            f"[train_{stage}] epoch={epoch+1}/{args.epochs}========================================\n"
+            f"total={losses['total'].item():.4f}\n"
+            f"warp_stage\n"
+            f"warp_l1={losses['warp_l1'].item():.4f} "
             f"edge={losses['grid_edge'].item():.4f} angle={losses['grid_angle'].item():.4f} "
-            f"seam={losses['seam_cost'].item():.4f} val_total={val_total:.4f}"
+            f"warp_nipple={losses['warp_nipple'].item():.4f}"
+        )
+        print(
+            f"fuse_stage\n"
+            f"seam_boundary={losses['seam_boundary'].item():.4f} "
+            f"seam_cost={losses['seam_cost'].item():.4f} fusion_smooth={losses['fusion_smooth'].item():.4f} "
+            f"fusion_nipple={losses['fusion_nipple'].item():.4f}"
         )
         if dl_val is not None and bad_epochs >= args.early_stopping_patience:
             print(f"[{stage}] early stopping at epoch {epoch+1}, best_val={best_val:.4f}")
@@ -122,7 +130,7 @@ def main() -> None:
     ap.add_argument("--out-dir", default="./outputs")
     ap.add_argument("--epochs", type=int, default=20)
     ap.add_argument("--batch-size", type=int, default=2)
-    ap.add_argument("--image-size", type=int, default=512, help="set <=0 to keep original slice size")
+    ap.add_argument("--image-size", type=int, default=0, help="set <=0 to keep original slice size")
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--val-split", type=float, default=0.1)
@@ -132,7 +140,7 @@ def main() -> None:
     ap.add_argument("--brightness-jitter", type=float, default=0.08)
     ap.add_argument("--contrast-jitter", type=float, default=0.08)
     ap.add_argument("--encoder-pretrain-source", choices=["imagenet", "radimagenet", "local", "none"], default="imagenet")
-    ap.add_argument("--encoder-ckpt", default=None, help="required for radimagenet/local source")
+    ap.add_argument("--encoder-ckpt", default="./ckpt/ResNet50", help="required for radimagenet/local source")
     ap.add_argument("--radimagenet-url", "--net-url", dest="radimagenet_url", default=None, help="optional URL for auto-downloading RadImageNet weights")
     ap.add_argument("--encoder-strict-load", action="store_true")
     ap.add_argument("--cpu", action="store_true")
