@@ -42,3 +42,4 @@ def test_fuse_case_from_pairwise(tmp_path: Path):
     n = fuse_case_from_pairwise(tmp_path / "12" / "case001", tmp_path / "23" / "case001", out_dir)
     assert n == 1
     assert (out_dir / "threeview_000.png").exists()
+    assert (out_dir / "metrics.csv").exists()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import random
 from typing import Dict, List
 
 import cv2
@@ -25,10 +26,23 @@ class ABUSPairDataset(Dataset):
       dataset/case001/nipple_x.txt   # [x1,x2,x3]
     """
 
-    def __init__(self, root: str | Path, stage: str = "12", image_size: int | None = 512):
+    def __init__(
+        self,
+        root: str | Path,
+        stage: str = "12",
+        image_size: int | None = 512,
+        augment: bool = False,
+        hflip_prob: float = 0.0,
+        brightness_jitter: float = 0.0,
+        contrast_jitter: float = 0.0,
+    ):
         self.root = Path(root)
         self.stage = stage
         self.image_size = image_size
+        self.augment = augment
+        self.hflip_prob = hflip_prob
+        self.brightness_jitter = brightness_jitter
+        self.contrast_jitter = contrast_jitter
         self.samples = self._scan_cases()
 
     @staticmethod
@@ -125,12 +139,46 @@ class ABUSPairDataset(Dataset):
         left_idx = self._view_index(sample.left_path)
         right_idx = self._view_index(sample.right_path)
 
+        left_x = torch.tensor([nipple_x[left_idx]], dtype=torch.float32)
+        right_x = torch.tensor([nipple_x[right_idx]], dtype=torch.float32)
+
+        if self.augment:
+            left, right, left_x, right_x = self._apply_pair_augment(left, right, left_x, right_x)
+
         return {
             "left": left,
             "right": right,
-            "left_x": torch.tensor([nipple_x[left_idx]], dtype=torch.float32),
-            "right_x": torch.tensor([nipple_x[right_idx]], dtype=torch.float32),
+            "left_x": left_x,
+            "right_x": right_x,
             "case": sample.case_dir.name,
             "left_path": str(sample.left_path),
             "right_path": str(sample.right_path),
         }
+
+    def _apply_pair_augment(
+        self,
+        left: torch.Tensor,
+        right: torch.Tensor,
+        left_x: torch.Tensor,
+        right_x: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        _, h, w = left.shape
+
+        # Horizontal flip (same transform on both views)
+        if self.hflip_prob > 0 and random.random() < self.hflip_prob:
+            left = torch.flip(left, dims=[2])
+            right = torch.flip(right, dims=[2])
+            left_x = (w - 1) - left_x
+            right_x = (w - 1) - right_x
+
+        # Brightness / contrast jitter
+        if self.brightness_jitter > 0:
+            bdelta = (random.random() * 2 - 1) * self.brightness_jitter
+            left = (left + bdelta).clamp(0, 1)
+            right = (right + bdelta).clamp(0, 1)
+        if self.contrast_jitter > 0:
+            cscale = 1.0 + (random.random() * 2 - 1) * self.contrast_jitter
+            left = ((left - 0.5) * cscale + 0.5).clamp(0, 1)
+            right = ((right - 0.5) * cscale + 0.5).clamp(0, 1)
+
+        return left, right, left_x, right_x

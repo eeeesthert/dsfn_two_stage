@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import math
 from pathlib import Path
 from typing import Iterable
 
@@ -64,7 +66,6 @@ def gaussian_pyramid_blend(images: Iterable[np.ndarray], weights: Iterable[np.nd
     imgs = [_resize_to(i, h, w) for i in imgs]
     ws = [_resize_to(wm, h, w) for wm in ws]
 
-    # normalize weights at full resolution
     wsum = np.sum(ws, axis=0) + 1e-6
     ws = [w_i / wsum for w_i in ws]
 
@@ -84,6 +85,148 @@ def gaussian_pyramid_blend(images: Iterable[np.ndarray], weights: Iterable[np.nd
 
     out = _reconstruct_laplacian(out_lap)
     return np.clip(out, 0.0, 1.0)
+
+
+def _apply_clahe_rgb(img: np.ndarray, clip_limit: float = 2.0, tile_grid_size: int = 8) -> np.ndarray:
+    u8 = (img * 255.0).clip(0, 255).astype(np.uint8)
+    lab = cv2.cvtColor(u8, cv2.COLOR_RGB2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(tile_grid_size, tile_grid_size))
+    l2 = clahe.apply(l)
+    out = cv2.cvtColor(cv2.merge([l2, a, b]), cv2.COLOR_LAB2RGB)
+    return out.astype(np.float32) / 255.0
+
+
+def _normalize_case_sizes(case_out_dir: Path) -> None:
+    imgs = sorted(case_out_dir.glob("threeview_*.png"))
+    if len(imgs) == 0:
+        return
+
+    sizes = []
+    arrays = []
+    for p in imgs:
+        im = _read_rgb(p)
+        arrays.append((p, im))
+        sizes.append(im.shape[:2])
+
+    min_h = min(h for h, _ in sizes)
+    min_w = min(w for _, w in sizes)
+
+    for p, im in arrays:
+        h, w = im.shape[:2]
+        x1 = max(0, (w - min_w) // 2)
+        x2 = x1 + min_w
+        # only crop bottom in vertical direction
+        y1, y2 = 0, min_h
+        crop = im[y1:y2, x1:x2]
+        cv2.imwrite(str(p), cv2.cvtColor((crop * 255).astype(np.uint8), cv2.COLOR_RGB2BGR))
+
+
+def _apply_clahe_case(case_out_dir: Path) -> None:
+    for p in sorted(case_out_dir.glob("threeview_*.png")):
+        im = _read_rgb(p)
+        im = _apply_clahe_rgb(im)
+        cv2.imwrite(str(p), cv2.cvtColor((im * 255).astype(np.uint8), cv2.COLOR_RGB2BGR))
+
+
+def _masked_gray(img: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    g = (0.299 * img[..., 0] + 0.587 * img[..., 1] + 0.114 * img[..., 2]).astype(np.float32)
+    return g[mask > 0]
+
+
+def _mse(a: np.ndarray, b: np.ndarray) -> float:
+    return float(np.mean((a - b) ** 2))
+
+
+def _psnr(a: np.ndarray, b: np.ndarray) -> float:
+    mse = _mse(a, b)
+    if mse <= 1e-12:
+        return 99.0
+    return float(10.0 * math.log10(1.0 / mse))
+
+
+def _ncc(a: np.ndarray, b: np.ndarray) -> float:
+    a0 = a - a.mean()
+    b0 = b - b.mean()
+    den = np.sqrt((a0**2).sum() * (b0**2).sum()) + 1e-8
+    return float((a0 * b0).sum() / den)
+
+
+def _ssim_global(a: np.ndarray, b: np.ndarray) -> float:
+    c1 = (0.01**2)
+    c2 = (0.03**2)
+    ma, mb = a.mean(), b.mean()
+    va, vb = a.var(), b.var()
+    cov = ((a - ma) * (b - mb)).mean()
+    num = (2 * ma * mb + c1) * (2 * cov + c2)
+    den = (ma * ma + mb * mb + c1) * (va + vb + c2)
+    return float(num / (den + 1e-8))
+
+
+def _safe_metrics(a: np.ndarray, b: np.ndarray) -> dict[str, float]:
+    if a.size < 16 or b.size < 16:
+        return {"mse": float("nan"), "psnr": float("nan"), "ssim": float("nan"), "ncc": float("nan")}
+    return {
+        "mse": _mse(a, b),
+        "psnr": _psnr(a, b),
+        "ssim": _ssim_global(a, b),
+        "ncc": _ncc(a, b),
+    }
+
+
+def _evaluate_metrics(case12_dir: Path, out_case_dir: Path) -> None:
+    f12 = case12_dir / "fusion"
+    w12 = case12_dir / "warp"
+    rows: list[dict[str, float | int]] = []
+
+    for i, stitched_p in enumerate(sorted(f12.glob("*_stitched.png"))):
+        prefix = stitched_p.stem.replace("_stitched", "")
+        warp1 = _read_rgb(w12 / f"{prefix}_left.png")
+        warp2 = _read_rgb(w12 / f"{prefix}_right.png")
+        s1 = _read_mask(f12 / f"{prefix}_mask_left_soft.png")
+        s2 = _read_mask(f12 / f"{prefix}_mask_right_soft.png")
+        stitched = _read_rgb(stitched_p)
+
+        h = max(warp1.shape[0], warp2.shape[0], stitched.shape[0])
+        w = max(warp1.shape[1], warp2.shape[1], stitched.shape[1])
+        warp1 = _resize_to(warp1, h, w)
+        warp2 = _resize_to(warp2, h, w)
+        stitched = _resize_to(stitched, h, w)
+        s1 = _resize_to(s1, h, w)
+        s2 = _resize_to(s2, h, w)
+
+        overlap = ((s1[..., 0] > 0) & (s2[..., 0] > 0)).astype(np.uint8)
+        a = _masked_gray(warp1, overlap)
+        b = _masked_gray(warp2, overlap)
+        reg = _safe_metrics(a, b)
+
+        i_fuse = s1 * warp1 + s2 * warp2
+        af = _masked_gray(stitched, np.ones_like(overlap))
+        bf = _masked_gray(i_fuse, np.ones_like(overlap))
+        fus = _safe_metrics(af, bf)
+
+        rows.append(
+            {
+                "idx": i,
+                "reg_mse": reg["mse"],
+                "reg_psnr": reg["psnr"],
+                "reg_ssim": reg["ssim"],
+                "reg_ncc": reg["ncc"],
+                "fus_mse": fus["mse"],
+                "fus_psnr": fus["psnr"],
+                "fus_ssim": fus["ssim"],
+                "fus_ncc": fus["ncc"],
+            }
+        )
+
+    if not rows:
+        return
+
+    out_csv = out_case_dir / "metrics.csv"
+    with out_csv.open("w", newline="", encoding="utf-8") as f:
+        wtr = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        wtr.writeheader()
+        wtr.writerows(rows)
 
 
 def fuse_case_from_pairwise(case12_dir: Path, case23_dir: Path, out_dir: Path, levels: int = 5, input2_boost: float = 2.0) -> int:
@@ -106,7 +249,6 @@ def fuse_case_from_pairwise(case12_dir: Path, case23_dir: Path, out_dir: Path, l
         pre12 = s12.stem.replace("_stitched", "")
         pre23 = s23.stem.replace("_stitched", "")
 
-        # input2 weights from stage12(right) and stage23(left)
         m12_path = f12 / f"{pre12}_mask_right_soft.png"
         m23_path = f23 / f"{pre23}_mask_left_soft.png"
         if not m12_path.exists():
@@ -126,20 +268,21 @@ def fuse_case_from_pairwise(case12_dir: Path, case23_dir: Path, out_dir: Path, l
         m12 = _resize_to(m12, h, w)
         m23 = _resize_to(m23, h, w)
 
-        # proxy input2 image from two pairwise outputs
         img2 = (m12 * img12 + m23 * img23) / (m12 + m23 + 1e-6)
-
-        # overlap of input2 from both stages => increase input2 weight
         overlap2 = np.minimum(m12, m23)
         w2 = np.clip(overlap2 * input2_boost, 0.0, 1.0)
         w12 = np.clip(1.0 - m23, 0.0, 1.0)
         w23 = np.clip(1.0 - m12, 0.0, 1.0)
 
         fused = gaussian_pyramid_blend([img12, img23, img2], [w12, w23, w2], levels=levels)
+
         out = (fused * 255.0).astype(np.uint8)
         out = cv2.cvtColor(out, cv2.COLOR_RGB2BGR)
-
         out_name = out_dir / f"threeview_{i:03d}.png"
         cv2.imwrite(str(out_name), out)
         count += 1
+
+    _normalize_case_sizes(out_dir)
+    _apply_clahe_case(out_dir)
+    _evaluate_metrics(case12_dir, out_dir)
     return count

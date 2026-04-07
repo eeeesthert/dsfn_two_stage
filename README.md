@@ -42,6 +42,11 @@
 python train_pairwise.py --dataset-root ./dataset --out-dir ./outputs
 ```
 
+可选训练增强与防过拟合：
+- `--augment` 开启数据增强（成对同步增强）
+- `--hflip-prob`、`--brightness-jitter`、`--contrast-jitter`
+- `--val-split` + `--early-stopping-patience` 启用 early stopping 与 best checkpoint（每个 stage 保存 `stage_xx_best.pt`）
+
 可插拔预训练来源（编码器）：
 - `--encoder-pretrain-source imagenet`：ImageNet 预训练（默认）
 - `--encoder-pretrain-source radimagenet --encoder-ckpt /path/to/radimagenet_resnet50.pth`
@@ -68,6 +73,7 @@ python train_pairwise.py --encoder-pretrain-source radimagenet --net-url https:/
 会依次训练并导出：
 - 第一步 `input1 + input2` (`stage=12`)
 - 第二步 `input2 + input3` (`stage=23`)
+- 两步共享同一套网络参数，训练结束仅保存一个共享 checkpoint（默认 `shared_model.pt`）
 
 每一步都会保存：
 - `warp/`：warp 后 left/right 图像
@@ -83,7 +89,7 @@ python train_pairwise.py --dataset-root ./dataset --image-size 0
 ## 推理
 
 ```bash
-python infer_pairwise.py --dataset-root ./dataset --checkpoint ./outputs/stage_23.pt --out-dir ./infer_outputs
+python infer_pairwise.py --dataset-root ./dataset --checkpoint ./outputs/shared_model.pt --out-dir ./infer_outputs
 ```
 
 同样支持 `--image-size 0` 保留输入原始尺寸。
@@ -93,9 +99,19 @@ python infer_pairwise.py --dataset-root ./dataset --checkpoint ./outputs/stage_2
 ```bash
 python infer_pairwise.py \
   --dataset-root ./dataset \
-  --checkpoint ./outputs/stage_23.pt \
+  --checkpoint ./outputs/shared_model.pt \
   --encoder-pretrain-source local \
   --encoder-ckpt /path/to/selfsup_checkpoint.pth
+```
+
+如果希望推理后直接做三视图融合（推荐）：
+
+```bash
+python infer_pairwise.py \
+  --dataset-root ./dataset \
+  --checkpoint ./outputs/shared_model.pt \
+  --out-dir ./infer_outputs \
+  --run-three-view-fusion
 ```
 
 ## 三视图融合（基于 input2 在 12/23 的 mask）
@@ -110,7 +126,10 @@ python fuse_three_view.py --pairwise-root ./outputs/results --out-dir ./outputs/
 - 读取 stage12/stage23 的 `fusion/*_stitched.png`
 - 使用 `stage12` 的 `mask_right` 和 `stage23` 的 `mask_left` 作为 input2 权重来源
 - 在 input2 的重叠区域（两张 mask 共同高响应处）放大 input2 权重
-- 用高斯/拉普拉斯金字塔进行三图加权融合，输出 `threeview_xxx.png`
+- 用高斯/拉普拉斯金字塔进行三图加权融合
+- 以 case 为单位统一尺寸：取该 case 最小尺寸，其他切片做中心左右裁剪 + 底部裁剪
+- 再对融合结果做 CLAHE（先裁剪再增强）
+- 输出 `threeview_xxx.png`，并保存评价指标 `metrics.csv`（配准一致性 + 融合一致性）
 
 ## 说明
 
