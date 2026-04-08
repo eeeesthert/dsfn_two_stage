@@ -23,6 +23,14 @@ def _read_mask(path: Path) -> np.ndarray:
     return (m.astype(np.float32) / 255.0)[..., None]
 
 
+def _read_soft_or_bin_mask(fusion_dir: Path, prefix: str, side: str) -> np.ndarray:
+    soft = fusion_dir / f"{prefix}_mask_{side}_soft.png"
+    if soft.exists():
+        return _read_mask(soft)
+    binary = fusion_dir / f"{prefix}_mask_{side}_bin.png"
+    return _read_mask(binary)
+
+
 def _resize_to(img: np.ndarray, h: int, w: int) -> np.ndarray:
     if img.shape[0] == h and img.shape[1] == w:
         return img
@@ -249,17 +257,14 @@ def fuse_case_from_pairwise(case12_dir: Path, case23_dir: Path, out_dir: Path, l
         pre12 = s12.stem.replace("_stitched", "")
         pre23 = s23.stem.replace("_stitched", "")
 
-        m12_path = f12 / f"{pre12}_mask_right_soft.png"
-        m23_path = f23 / f"{pre23}_mask_left_soft.png"
-        if not m12_path.exists():
-            m12_path = f12 / f"{pre12}_mask_right_bin.png"
-        if not m23_path.exists():
-            m23_path = f23 / f"{pre23}_mask_left_bin.png"
-
         img12 = _read_rgb(s12)
         img23 = _read_rgb(s23)
-        m12 = _read_mask(m12_path)
-        m23 = _read_mask(m23_path)
+        m12 = _read_soft_or_bin_mask(f12, pre12, "right")
+        m23 = _read_soft_or_bin_mask(f23, pre23, "left")
+        l12 = _read_soft_or_bin_mask(f12, pre12, "left")
+        r12 = _read_soft_or_bin_mask(f12, pre12, "right")
+        l23 = _read_soft_or_bin_mask(f23, pre23, "left")
+        r23 = _read_soft_or_bin_mask(f23, pre23, "right")
 
         h = max(img12.shape[0], img23.shape[0])
         w = max(img12.shape[1], img23.shape[1])
@@ -267,14 +272,24 @@ def fuse_case_from_pairwise(case12_dir: Path, case23_dir: Path, out_dir: Path, l
         img23 = _resize_to(img23, h, w)
         m12 = _resize_to(m12, h, w)
         m23 = _resize_to(m23, h, w)
+        l12 = _resize_to(l12, h, w)
+        r12 = _resize_to(r12, h, w)
+        l23 = _resize_to(l23, h, w)
+        r23 = _resize_to(r23, h, w)
 
+        valid12 = np.clip(l12 + r12, 0.0, 1.0)
+        valid23 = np.clip(l23 + r23, 0.0, 1.0)
         img2 = (m12 * img12 + m23 * img23) / (m12 + m23 + 1e-6)
         overlap2 = np.minimum(m12, m23)
         w2 = np.clip(overlap2 * input2_boost, 0.0, 1.0)
-        w12 = np.clip(1.0 - m23, 0.0, 1.0)
-        w23 = np.clip(1.0 - m12, 0.0, 1.0)
+        w12 = np.clip(valid12 * (1.0 - w2), 0.0, 1.0)
+        w23 = np.clip(valid23 * (1.0 - w2), 0.0, 1.0)
 
         fused = gaussian_pyramid_blend([img12, img23, img2], [w12, w23, w2], levels=levels)
+        wt = w12 + w23 + w2
+        fallback = (valid12 * img12 + valid23 * img23) / (valid12 + valid23 + 1e-6)
+        missing = (wt < 1e-4) & ((valid12 + valid23) > 1e-4)
+        fused = np.where(missing, fallback, fused)
 
         out = (fused * 255.0).astype(np.uint8)
         out = cv2.cvtColor(out, cv2.COLOR_RGB2BGR)

@@ -43,3 +43,24 @@ def test_fuse_case_from_pairwise(tmp_path: Path):
     assert n == 1
     assert (out_dir / "threeview_000.png").exists()
     assert (out_dir / "metrics.csv").exists()
+
+
+def test_fuse_case_no_hole_when_only_one_stage_valid(tmp_path: Path):
+    c12 = tmp_path / "12" / "case001" / "fusion"
+    c23 = tmp_path / "23" / "case001" / "fusion"
+    c12.mkdir(parents=True)
+    c23.mkdir(parents=True)
+
+    _write_rgb(c12 / "12_000_stitched.png", 180)
+    _write_rgb(c23 / "23_000_stitched.png", 0)
+    _write_mask(c12 / "12_000_mask_left_soft.png", 255)
+    _write_mask(c12 / "12_000_mask_right_soft.png", 0)
+    _write_mask(c23 / "23_000_mask_left_soft.png", 0)
+    _write_mask(c23 / "23_000_mask_right_soft.png", 0)
+
+    out_dir = tmp_path / "out"
+    n = fuse_case_from_pairwise(tmp_path / "12" / "case001", tmp_path / "23" / "case001", out_dir)
+    assert n == 1
+    im = cv2.imread(str(out_dir / "threeview_000.png"), cv2.IMREAD_GRAYSCALE)
+    assert im is not None
+    assert float(im.mean()) > 100.0
