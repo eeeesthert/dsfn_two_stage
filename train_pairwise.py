@@ -251,11 +251,11 @@ def export_samples(args: argparse.Namespace, stage: str, model: TwoStageStitcher
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dataset-root", default="./dataset")
+    ap.add_argument("--dataset-root", default="./dataset/train")
     ap.add_argument("--out-dir", default="./outputs")
     ap.add_argument("--epochs", type=int, default=20)
     ap.add_argument("--batch-size", type=int, default=2)
-    ap.add_argument("--image-size", type=int, default=512, help="set <=0 to keep original slice size")
+    ap.add_argument("--image-size", type=int, default=0, help="set <=0 to keep original slice size")
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--val-split", type=float, default=0.1)
@@ -265,7 +265,7 @@ def main() -> None:
     ap.add_argument("--brightness-jitter", type=float, default=0.08)
     ap.add_argument("--contrast-jitter", type=float, default=0.08)
     ap.add_argument("--encoder-pretrain-source", choices=["imagenet", "radimagenet", "local", "none"], default="imagenet")
-    ap.add_argument("--encoder-ckpt", default=None, help="required for radimagenet/local source")
+    ap.add_argument("--encoder-ckpt", default="./ckpt/ResNet50.pt", help="required for radimagenet/local source")
     ap.add_argument("--radimagenet-url", "--net-url", dest="radimagenet_url", default=None, help="optional URL for auto-downloading RadImageNet weights")
     ap.add_argument("--encoder-strict-load", action="store_true")
     ap.add_argument("--cpu", action="store_true")
