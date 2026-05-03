@@ -5,6 +5,7 @@ import copy
 from pathlib import Path
 
 import torch
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.utils.data.dataset import random_split
 
@@ -57,9 +58,33 @@ def build_stage_loaders(args: argparse.Namespace, stage: str) -> tuple[DataLoade
     else:
         ds_train, ds_val = ds, None
 
-    dl = DataLoader(ds_train, batch_size=args.batch_size, shuffle=True, num_workers=2)
-    dl_val = DataLoader(ds_val, batch_size=args.batch_size, shuffle=False, num_workers=2) if ds_val is not None else None
+    dl = DataLoader(ds_train, batch_size=args.batch_size, shuffle=True, num_workers=2, collate_fn=pair_collate_pad)
+    dl_val = DataLoader(ds_val, batch_size=args.batch_size, shuffle=False, num_workers=2, collate_fn=pair_collate_pad) if ds_val is not None else None
     return dl, dl_val
+
+
+def pair_collate_pad(batch: list[dict]) -> dict:
+    """
+    Collate variable-size pair images by zero-padding to max H/W in batch.
+    Keep x positions unchanged in original pixel coordinates.
+    """
+    max_h = max(item["left"].shape[1] for item in batch)
+    max_w = max(item["left"].shape[2] for item in batch)
+
+    def _pad_img(x: torch.Tensor) -> torch.Tensor:
+        _, h, w = x.shape
+        return F.pad(x, (0, max_w - w, 0, max_h - h), mode="constant", value=0.0)
+
+    out = {
+        "left": torch.stack([_pad_img(item["left"]) for item in batch], dim=0),
+        "right": torch.stack([_pad_img(item["right"]) for item in batch], dim=0),
+        "left_x": torch.stack([item["left_x"] for item in batch], dim=0),
+        "right_x": torch.stack([item["right_x"] for item in batch], dim=0),
+        "case": [item["case"] for item in batch],
+        "left_path": [item["left_path"] for item in batch],
+        "right_path": [item["right_path"] for item in batch],
+    }
+    return out
 
 
 def evaluate_loader(
