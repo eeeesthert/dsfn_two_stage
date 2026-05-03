@@ -208,7 +208,7 @@ def _evaluate_metrics(case12_dir: Path, out_case_dir: Path) -> None:
         b = _masked_gray(warp2, overlap)
         reg = _safe_metrics(a, b)
 
-        i_fuse = s1 * warp1 + s2 * warp2
+        i_fuse = (s1 * warp1 + s2 * warp2) / (s1 + s2 + 1e-6)
         af = _masked_gray(stitched, np.ones_like(overlap))
         bf = _masked_gray(i_fuse, np.ones_like(overlap))
         fus = _safe_metrics(af, bf)

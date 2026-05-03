@@ -4,7 +4,7 @@
 
 1. **Warp 阶段（两阶段）**：
    - 阶段1：1/16 特征上做 FCA + RR，回归四顶点偏移，DLT 求粗单应矩阵 \(H_c\)
-   - 阶段2：预测网格控制点位移，使用高斯 RBF 插值连续变形场 \(\Delta\)
+   - 阶段2：预测网格控制点位移，默认使用 **TPS refinement** 插值连续变形场 \(\Delta\)（可回退到 RBF）
    - 最终 warp：`img ∘ Hc + Δ`
 2. **Fusion 阶段**：dilated conv U-Net，在 skip 连接中引入差分特征，预测 overlap 内 soft seam，并与 warp mask 融合得到最终 mask
 
@@ -12,7 +12,7 @@
 
 损失函数：
 - Warp 阶段：`overlap_l1_warp_loss`、`grid_edge_length_loss`、`grid_angle_loss`、`nipple_heatmap_alignment_loss`
-- Fusion 阶段：`seam_overlap_boundary_loss`、`seam_cost_loss`、`fusion_smoothness_loss`、`nipple_heatmap_alignment_loss`
+- Fusion 阶段：`seam_overlap_boundary_loss`、`seam_cost_loss`、`fusion_smoothness_loss`、`nipple_heatmap_alignment_loss`、`fusion_consistency_loss`
 - 优化器：Adam + ExponentialLR
 - 默认损失权重（重叠区域较大时推荐）：`warp_l1=1.0, grid_edge=4.0, grid_angle=2.0, warp_nipple=0.5, seam_boundary=1.0, seam_cost=2.0, fusion_smooth=0.2, fusion_nipple=0.5`
 
@@ -42,10 +42,9 @@
 python train_pairwise.py --dataset-root ./dataset --out-dir ./outputs
 ```
 
-可选训练增强与防过拟合：
-- `--augment` 开启数据增强（成对同步增强）
-- `--hflip-prob`、`--brightness-jitter`、`--contrast-jitter`
-- `--val-split` + `--early-stopping-patience` 启用 early stopping 与 best checkpoint（每个 stage 保存 `stage_xx_best.pt`）
+当前版本默认关闭数据增强（按你的要求先不做增强）；
+- `--hflip-prob`、`--brightness-jitter`、`--contrast-jitter` 参数暂不启用
+- `--val-split` + `--early-stopping-patience` 启用 early stopping（最佳权重保存在内存，最终只导出共享 checkpoint）
 
 可插拔预训练来源（编码器）：
 - `--encoder-pretrain-source imagenet`：ImageNet 预训练（默认）

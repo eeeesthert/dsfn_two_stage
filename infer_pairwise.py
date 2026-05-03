@@ -7,7 +7,6 @@ import torch
 
 from abus_pairwise.datasets import ABUSPairDataset
 from abus_pairwise.pipeline import TwoStageStitcher, save_stage_results
-from abus_pairwise.three_view_fusion import fuse_case_from_pairwise
 
 
 def run_stage(model: TwoStageStitcher, dataset_root: str, stage: str, out_dir: str, image_size: int, device: torch.device) -> None:
@@ -28,19 +27,15 @@ def run_stage(model: TwoStageStitcher, dataset_root: str, stage: str, out_dir: s
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dataset-root", default="./dataset/infer")
-    ap.add_argument("--checkpoint", default="./outputs/shared_model.pt",required=True)
+    ap.add_argument("--dataset-root", default="./dataset")
+    ap.add_argument("--checkpoint", required=True)
     ap.add_argument("--out-dir", default="./infer_outputs")
-    ap.add_argument("--image-size", type=int, default=0, help="set <=0 to keep original slice size")
+    ap.add_argument("--image-size", type=int, default=512, help="set <=0 to keep original slice size")
     ap.add_argument("--encoder-pretrain-source", choices=["imagenet", "radimagenet", "local", "none"], default="imagenet")
-    ap.add_argument("--encoder-ckpt", default="./ckpt/ResNet50", help="required for radimagenet/local source")
+    ap.add_argument("--encoder-ckpt", default=None, help="required for radimagenet/local source")
     ap.add_argument("--radimagenet-url", "--net-url", dest="radimagenet_url", default=None, help="optional URL for auto-downloading RadImageNet weights")
     ap.add_argument("--encoder-strict-load", action="store_true")
     ap.add_argument("--cpu", action="store_true")
-    ap.add_argument("--run-three-view-fusion", default=True, action="store_true", help="run three-view fusion after stage12/stage23 inference")
-    ap.add_argument("--three-view-out-dir", default="./infer_outputs/tri_view", help="default: <out-dir>/three_view")
-    ap.add_argument("--three-view-levels", type=int, default=5)
-    ap.add_argument("--three-view-input2-boost", type=float, default=2.0)
     args = ap.parse_args()
 
     device = torch.device("cpu" if args.cpu or not torch.cuda.is_available() else "cuda")
@@ -54,25 +49,6 @@ def main() -> None:
 
     run_stage(model, args.dataset_root, stage="12", out_dir=args.out_dir, image_size=args.image_size, device=device)
     run_stage(model, args.dataset_root, stage="23", out_dir=args.out_dir, image_size=args.image_size, device=device)
-
-    if args.run_three_view_fusion:
-        pair_root = Path(args.out_dir)
-        out_root = Path(args.three_view_out_dir) if args.three_view_out_dir else (pair_root / "three_view")
-        total = 0
-        for case12 in sorted((pair_root / "12").glob("case*")):
-            case23 = pair_root / "23" / case12.name
-            if not case23.exists():
-                continue
-            n = fuse_case_from_pairwise(
-                case12,
-                case23,
-                out_dir=out_root / case12.name,
-                levels=args.three_view_levels,
-                input2_boost=args.three_view_input2_boost,
-            )
-            total += n
-        print(f"[infer] three-view fused images saved: {total}")
-
 
 if __name__ == "__main__":
     main()

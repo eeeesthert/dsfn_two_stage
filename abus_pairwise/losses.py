@@ -105,3 +105,78 @@ def fusion_smoothness_loss(stitched: torch.Tensor) -> torch.Tensor:
     dx = (stitched[:, :, :, 1:] - stitched[:, :, :, :-1]).abs().mean()
     dy = (stitched[:, :, 1:, :] - stitched[:, :, :-1, :]).abs().mean()
     return dx + dy
+
+
+def _masked_l1(a: torch.Tensor, b: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    e = (a - b).abs().mean(1, keepdim=True) * mask
+    return e.sum() / mask.sum().clamp_min(1.0)
+
+
+def _ssim_map(x: torch.Tensor, y: torch.Tensor, window: int = 7) -> torch.Tensor:
+    c1, c2 = 0.01**2, 0.03**2
+    mu_x = F.avg_pool2d(x, window, stride=1, padding=window // 2)
+    mu_y = F.avg_pool2d(y, window, stride=1, padding=window // 2)
+    sigma_x = F.avg_pool2d(x * x, window, stride=1, padding=window // 2) - mu_x * mu_x
+    sigma_y = F.avg_pool2d(y * y, window, stride=1, padding=window // 2) - mu_y * mu_y
+    sigma_xy = F.avg_pool2d(x * y, window, stride=1, padding=window // 2) - mu_x * mu_y
+    num = (2 * mu_x * mu_y + c1) * (2 * sigma_xy + c2)
+    den = (mu_x * mu_x + mu_y * mu_y + c1) * (sigma_x + sigma_y + c2)
+    return num / (den + 1e-6)
+
+
+def fusion_consistency_loss(stitched: torch.Tensor, left_warp: torch.Tensor, right_warp: torch.Tensor) -> torch.Tensor:
+    valid_left = (left_warp.sum(1, keepdim=True) > 0).float()
+    valid_right = (right_warp.sum(1, keepdim=True) > 0).float()
+    union = torch.clamp(valid_left + valid_right, 0.0, 1.0)
+    overlap = valid_left * valid_right
+
+    l_rec = _masked_l1(stitched, left_warp, valid_left)
+    r_rec = _masked_l1(stitched, right_warp, valid_right)
+    union_ref = (left_warp * valid_left + right_warp * valid_right) / (valid_left + valid_right + 1e-6)
+    u_rec = _masked_l1(stitched, union_ref, union)
+
+    return 0.4 * (l_rec + r_rec) + 0.6 * u_rec
+
+
+def seam_band_mask(overlap: torch.Tensor, k: int = 15) -> torch.Tensor:
+    blur = F.avg_pool2d(overlap, kernel_size=k, stride=1, padding=k // 2)
+    return ((blur > 1e-4) & (blur < 1 - 1e-4)).float()
+
+
+def fusion_ssim_overlap_band_loss(stitched: torch.Tensor, left_warp: torch.Tensor, right_warp: torch.Tensor) -> torch.Tensor:
+    valid_left = (left_warp.sum(1, keepdim=True) > 0).float()
+    valid_right = (right_warp.sum(1, keepdim=True) > 0).float()
+    overlap = valid_left * valid_right
+    band = seam_band_mask(overlap)
+    region = torch.clamp(overlap + band, 0.0, 1.0)
+    ssim_left = _ssim_map(stitched, left_warp).mean(1, keepdim=True)
+    ssim_right = _ssim_map(stitched, right_warp).mean(1, keepdim=True)
+    l = ((1.0 - ssim_left) * region).sum() / region.sum().clamp_min(1.0)
+    r = ((1.0 - ssim_right) * region).sum() / region.sum().clamp_min(1.0)
+    return 0.5 * (l + r)
+
+
+def _ncc_2d(a: torch.Tensor, b: torch.Tensor, m: torch.Tensor) -> torch.Tensor:
+    eps = 1e-6
+    den = m.sum(dim=(2, 3), keepdim=True).clamp_min(1.0)
+    am = (a * m).sum(dim=(2, 3), keepdim=True) / den
+    bm = (b * m).sum(dim=(2, 3), keepdim=True) / den
+    a0 = (a - am) * m
+    b0 = (b - bm) * m
+    num = (a0 * b0).sum(dim=(2, 3), keepdim=True)
+    d = torch.sqrt((a0 * a0).sum(dim=(2, 3), keepdim=True) * (b0 * b0).sum(dim=(2, 3), keepdim=True) + eps)
+    return num / d
+
+
+def fusion_ncc_overlap_band_loss(stitched: torch.Tensor, left_warp: torch.Tensor, right_warp: torch.Tensor) -> torch.Tensor:
+    g_s = stitched.mean(1, keepdim=True)
+    g_l = left_warp.mean(1, keepdim=True)
+    g_r = right_warp.mean(1, keepdim=True)
+    valid_left = (left_warp.sum(1, keepdim=True) > 0).float()
+    valid_right = (right_warp.sum(1, keepdim=True) > 0).float()
+    overlap = valid_left * valid_right
+    band = seam_band_mask(overlap)
+    region = torch.clamp(overlap + band, 0.0, 1.0)
+    n1 = _ncc_2d(g_s, g_l, region)
+    n2 = _ncc_2d(g_s, g_r, region)
+    return 1.0 - 0.5 * (n1.mean() + n2.mean())

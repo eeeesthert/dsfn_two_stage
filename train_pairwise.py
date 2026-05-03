@@ -12,13 +12,34 @@ from abus_pairwise.datasets import ABUSPairDataset
 from abus_pairwise.pipeline import LossWeights, TwoStageStitcher, compute_total_loss, save_stage_results
 
 
+def build_loss_weights(args: argparse.Namespace) -> LossWeights:
+    lw = LossWeights()
+    lw.warp_l1 = args.w_warp_l1
+    lw.grid_edge = args.w_grid_edge
+    lw.grid_angle = args.w_grid_angle
+    lw.warp_nipple = args.w_warp_nipple
+    lw.seam_boundary = args.w_seam_boundary
+    lw.seam_cost = args.w_seam_cost
+    lw.fusion_smooth = args.w_fusion_smooth
+    lw.fusion_nipple = args.w_fusion_nipple
+    lw.fusion_consistency = args.w_fusion_consistency
+    lw.fusion_ssim_main = args.w_fusion_ssim_main
+    lw.fusion_ncc = args.w_fusion_ncc
+    for name in [
+        "warp_l1","grid_edge","grid_angle","warp_nipple","seam_boundary","seam_cost",
+        "fusion_smooth","fusion_nipple","fusion_consistency","fusion_ssim_main","fusion_ncc",
+    ]:
+        setattr(lw, f"enable_{name}", not getattr(args, f"disable_{name}"))
+    return lw
+
+
 def build_stage_loaders(args: argparse.Namespace, stage: str) -> tuple[DataLoader, DataLoader | None]:
     img_size = None if args.image_size <= 0 else args.image_size
     ds = ABUSPairDataset(
         args.dataset_root,
         stage=stage,
         image_size=img_size,
-        augment=args.augment,
+        augment=False,
         hflip_prob=args.hflip_prob,
         brightness_jitter=args.brightness_jitter,
         contrast_jitter=args.contrast_jitter,
@@ -70,7 +91,7 @@ def train_stage(args: argparse.Namespace, stage: str, model: TwoStageStitcher, d
 
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optim, gamma=0.98)
-    lw = LossWeights()
+    lw = build_loss_weights(args)
     best_val = float("inf")
     bad_epochs = 0
     best_state = copy.deepcopy(model.state_dict())
@@ -124,7 +145,7 @@ def train_interleaved(args: argparse.Namespace, model: TwoStageStitcher, device:
 
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optim, gamma=0.98)
-    lw = LossWeights()
+    lw = build_loss_weights(args)
     best_val = float("inf")
     bad_epochs = 0
     best_state = copy.deepcopy(model.state_dict())
@@ -209,7 +230,7 @@ def main() -> None:
     ap.add_argument("--out-dir", default="./outputs")
     ap.add_argument("--epochs", type=int, default=20)
     ap.add_argument("--batch-size", type=int, default=2)
-    ap.add_argument("--image-size", type=int, default=0, help="set <=0 to keep original slice size")
+    ap.add_argument("--image-size", type=int, default=512, help="set <=0 to keep original slice size")
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--val-split", type=float, default=0.1)
@@ -219,12 +240,28 @@ def main() -> None:
     ap.add_argument("--brightness-jitter", type=float, default=0.08)
     ap.add_argument("--contrast-jitter", type=float, default=0.08)
     ap.add_argument("--encoder-pretrain-source", choices=["imagenet", "radimagenet", "local", "none"], default="imagenet")
-    ap.add_argument("--encoder-ckpt", default="./ckpt/ResNet50", help="required for radimagenet/local source")
+    ap.add_argument("--encoder-ckpt", default=None, help="required for radimagenet/local source")
     ap.add_argument("--radimagenet-url", "--net-url", dest="radimagenet_url", default=None, help="optional URL for auto-downloading RadImageNet weights")
     ap.add_argument("--encoder-strict-load", action="store_true")
     ap.add_argument("--cpu", action="store_true")
     ap.add_argument("--shared-ckpt-name", default="shared_model.pt")
     ap.add_argument("--training-schedule", choices=["interleaved", "sequential"], default="interleaved")
+    ap.add_argument("--w-warp-l1", type=float, default=0.5)
+    ap.add_argument("--w-grid-edge", type=float, default=6.0)
+    ap.add_argument("--w-grid-angle", type=float, default=3.0)
+    ap.add_argument("--w-warp-nipple", type=float, default=0.5)
+    ap.add_argument("--w-seam-boundary", type=float, default=1.0)
+    ap.add_argument("--w-seam-cost", type=float, default=1.0)
+    ap.add_argument("--w-fusion-smooth", type=float, default=0.1)
+    ap.add_argument("--w-fusion-nipple", type=float, default=0.3)
+    ap.add_argument("--w-fusion-consistency", type=float, default=0.3)
+    ap.add_argument("--w-fusion-ssim-main", type=float, default=2.5)
+    ap.add_argument("--w-fusion-ncc", type=float, default=2.5)
+    for name in [
+        "warp_l1","grid_edge","grid_angle","warp_nipple","seam_boundary","seam_cost",
+        "fusion_smooth","fusion_nipple","fusion_consistency","fusion_ssim_main","fusion_ncc",
+    ]:
+        ap.add_argument(f"--disable-{name}", action="store_true")
     args = ap.parse_args()
 
     torch.manual_seed(args.seed)

@@ -7,7 +7,10 @@ import torch
 from torchvision.utils import save_image
 
 from .losses import (
+    fusion_consistency_loss,
+    fusion_ncc_overlap_band_loss,
     fusion_smoothness_loss,
+    fusion_ssim_overlap_band_loss,
     grid_angle_loss,
     grid_edge_length_loss,
     nipple_heatmap_alignment_loss,
@@ -44,7 +47,7 @@ class TwoStageStitcher(torch.nn.Module):
         right_x: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         warp_out = self.warp_net(left, right, left_x=left_x, right_x=right_x)
-        fus_out = self.fusion_net(warp_out["left_warp"], warp_out["right_warp"])
+        fus_out = self.fusion_net(warp_out["left_warp"], warp_out["right_warp"], use_overlap_intensity_match=True)
         return {**warp_out, **fus_out}
 
 
@@ -59,6 +62,20 @@ class LossWeights:
     seam_cost: float = 2.0
     fusion_smooth: float = 0.2
     fusion_nipple: float = 0.5
+    fusion_consistency: float = 0.5
+    fusion_ssim_main: float = 2.0
+    fusion_ncc: float = 2.0
+    enable_warp_l1: bool = True
+    enable_grid_edge: bool = True
+    enable_grid_angle: bool = True
+    enable_warp_nipple: bool = True
+    enable_seam_boundary: bool = True
+    enable_seam_cost: bool = True
+    enable_fusion_smooth: bool = True
+    enable_fusion_nipple: bool = True
+    enable_fusion_consistency: bool = True
+    enable_fusion_ssim_main: bool = True
+    enable_fusion_ncc: bool = True
 
 
 def compute_total_loss(
@@ -80,17 +97,22 @@ def compute_total_loss(
     l_seam_cost = seam_cost_loss(outputs["left_warp"], outputs["right_warp"], outputs["seam_soft"])
     l_smooth = fusion_smoothness_loss(outputs["stitched"])
     l_nipple_fus = nipple_heatmap_alignment_loss(outputs["stitched"], outputs["right_warp"], left_x, right_x)
+    l_fusion_cons = fusion_consistency_loss(outputs["stitched"], outputs["left_warp"], outputs["right_warp"])
+    l_fusion_ssim_main = fusion_ssim_overlap_band_loss(outputs["stitched"], outputs["left_warp"], outputs["right_warp"])
+    l_fusion_ncc = fusion_ncc_overlap_band_loss(outputs["stitched"], outputs["left_warp"], outputs["right_warp"])
 
-    total = (
-        w.warp_l1 * l_warp_l1
-        + w.grid_edge * l_edge
-        + w.grid_angle * l_angle
-        + w.warp_nipple * l_nipple_warp
-        + w.seam_boundary * l_boundary
-        + w.seam_cost * l_seam_cost
-        + w.fusion_smooth * l_smooth
-        + w.fusion_nipple * l_nipple_fus
-    )
+    total = 0.0
+    total = total + (w.warp_l1 * l_warp_l1 if w.enable_warp_l1 else 0.0)
+    total = total + (w.grid_edge * l_edge if w.enable_grid_edge else 0.0)
+    total = total + (w.grid_angle * l_angle if w.enable_grid_angle else 0.0)
+    total = total + (w.warp_nipple * l_nipple_warp if w.enable_warp_nipple else 0.0)
+    total = total + (w.seam_boundary * l_boundary if w.enable_seam_boundary else 0.0)
+    total = total + (w.seam_cost * l_seam_cost if w.enable_seam_cost else 0.0)
+    total = total + (w.fusion_smooth * l_smooth if w.enable_fusion_smooth else 0.0)
+    total = total + (w.fusion_nipple * l_nipple_fus if w.enable_fusion_nipple else 0.0)
+    total = total + (w.fusion_consistency * l_fusion_cons if w.enable_fusion_consistency else 0.0)
+    total = total + (w.fusion_ssim_main * l_fusion_ssim_main if w.enable_fusion_ssim_main else 0.0)
+    total = total + (w.fusion_ncc * l_fusion_ncc if w.enable_fusion_ncc else 0.0)
     return {
         "total": total,
         "warp_l1": l_warp_l1,
@@ -101,6 +123,9 @@ def compute_total_loss(
         "seam_cost": l_seam_cost,
         "fusion_smooth": l_smooth,
         "fusion_nipple": l_nipple_fus,
+        "fusion_consistency": l_fusion_cons,
+        "fusion_ssim_main": l_fusion_ssim_main,
+        "fusion_ncc": l_fusion_ncc,
     }
 
 

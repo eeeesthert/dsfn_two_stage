@@ -104,6 +104,7 @@ class WarpStage(nn.Module):
         encoder_strict_load: bool = False,
         grid_h: int = 9,
         grid_w: int = 9,
+        local_refine_mode: str = "tps",
     ):
         super().__init__()
         self.encoder = ResNet50MultiScale(
@@ -116,6 +117,7 @@ class WarpStage(nn.Module):
         self.rr = RR(c=256)
         self.local_head = LocalGridHead(c=512, gh=grid_h, gw=grid_w)
         self.grid_h, self.grid_w = grid_h, grid_w
+        self.local_refine_mode = local_refine_mode
 
     @staticmethod
     def _base_grid(b: int, h: int, w: int, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
@@ -151,6 +153,51 @@ class WarpStage(nn.Module):
         wgt = wgt / (wgt.sum(-1, keepdim=True) + 1e-6)
 
         dense = torch.einsum("bpk,bkc->bpc", wgt.repeat(b, 1, 1), disp)
+        return dense.view(b, h, w, 2).permute(0, 3, 1, 2)
+
+    def _tps_interpolate(self, ctrl_disp: torch.Tensor, h: int, w: int, reg: float = 1e-3) -> torch.Tensor:
+        """control disp (B,2,Gh,Gw) -> dense field (B,2,H,W) via thin-plate spline."""
+        b, _, gh, gw = ctrl_disp.shape
+        device, dtype = ctrl_disp.device, ctrl_disp.dtype
+        n = gh * gw
+
+        cy, cx = torch.meshgrid(
+            torch.linspace(-1, 1, gh, device=device, dtype=dtype),
+            torch.linspace(-1, 1, gw, device=device, dtype=dtype),
+            indexing="ij",
+        )
+        ctrl = torch.stack([cx, cy], dim=-1).view(n, 2)  # (N,2)
+        disp = ctrl_disp.permute(0, 2, 3, 1).reshape(b, n, 2)  # (B,N,2)
+
+        d2 = ((ctrl[:, None, :] - ctrl[None, :, :]) ** 2).sum(-1).clamp_min(1e-12)  # (N,N)
+        k = d2 * torch.log(d2)
+        k = k + torch.eye(n, device=device, dtype=dtype) * reg
+        p = torch.cat([torch.ones(n, 1, device=device, dtype=dtype), ctrl], dim=1)  # (N,3)
+
+        l = torch.zeros(n + 3, n + 3, device=device, dtype=dtype)
+        l[:n, :n] = k
+        l[:n, n:] = p
+        l[n:, :n] = p.t()
+
+        rhs = torch.zeros(b, n + 3, 2, device=device, dtype=dtype)
+        rhs[:, :n, :] = disp
+        theta = torch.linalg.solve(l.unsqueeze(0).expand(b, -1, -1), rhs)  # (B,N+3,2)
+        w_tps = theta[:, :n, :]
+        a_tps = theta[:, n:, :]  # (B,3,2)
+
+        yy, xx = torch.meshgrid(
+            torch.linspace(-1, 1, h, device=device, dtype=dtype),
+            torch.linspace(-1, 1, w, device=device, dtype=dtype),
+            indexing="ij",
+        )
+        pts = torch.stack([xx, yy], dim=-1).view(h * w, 2)  # (M,2)
+        d2p = ((pts[:, None, :] - ctrl[None, :, :]) ** 2).sum(-1).clamp_min(1e-12)  # (M,N)
+        u = d2p * torch.log(d2p)
+        p_pts = torch.cat([torch.ones(h * w, 1, device=device, dtype=dtype), pts], dim=1)  # (M,3)
+
+        non_affine = torch.einsum("mn,bnc->bmc", u, w_tps)
+        affine = torch.einsum("mk,bkc->bmc", p_pts, a_tps)
+        dense = non_affine + affine
         return dense.view(b, h, w, 2).permute(0, 3, 1, 2)
 
     @staticmethod
@@ -214,7 +261,10 @@ class WarpStage(nn.Module):
         ctrl_disp = self.local_head(f_l[1], f_r_8_w).tanh() * 0.12
 
         _, _, h, w = left.shape
-        dense_delta = self._rbf_interpolate(ctrl_disp, h=h, w=w)
+        if self.local_refine_mode == "tps":
+            dense_delta = self._tps_interpolate(ctrl_disp, h=h, w=w)
+        else:
+            dense_delta = self._rbf_interpolate(ctrl_disp, h=h, w=w)
 
         base_grid = self._base_grid(b, h, w, left.device, left.dtype)
         grid_h = _warp_grid_by_h(base_grid, h_c)

@@ -45,7 +45,37 @@ class SoftSeamFusionUNet(nn.Module):
             nn.Conv2d(16, 1, 1),
         )
 
-    def forward(self, left_warp: torch.Tensor, right_warp: torch.Tensor) -> dict[str, torch.Tensor]:
+    @staticmethod
+    def _match_intensity_overlap(
+        left_warp: torch.Tensor,
+        right_warp: torch.Tensor,
+        valid_left: torch.Tensor,
+        valid_right: torch.Tensor,
+        enable: bool,
+        decay_power: float = 2.0,
+    ) -> torch.Tensor:
+        if not enable:
+            return right_warp
+        overlap = valid_left * valid_right
+        if overlap.sum() < 1:
+            return right_warp
+        eps = 1e-6
+        om = overlap.sum(dim=(2, 3), keepdim=True).clamp_min(1.0)
+        l_mu = (left_warp * overlap).sum(dim=(2, 3), keepdim=True) / om
+        r_mu = (right_warp * overlap).sum(dim=(2, 3), keepdim=True) / om
+        l_var = (((left_warp - l_mu) ** 2) * overlap).sum(dim=(2, 3), keepdim=True) / om
+        r_var = (((right_warp - r_mu) ** 2) * overlap).sum(dim=(2, 3), keepdim=True) / om
+        r_std = torch.sqrt(r_var + eps)
+        l_std = torch.sqrt(l_var + eps)
+        corrected = (right_warp - r_mu) * (l_std / r_std) + l_mu
+        prox = torch.nn.functional.avg_pool2d(overlap, kernel_size=31, stride=1, padding=15)
+        alpha = prox.clamp(0.0, 1.0) ** decay_power
+        return alpha * corrected + (1.0 - alpha) * right_warp
+
+    def forward(self, left_warp: torch.Tensor, right_warp: torch.Tensor, use_overlap_intensity_match: bool = True) -> dict[str, torch.Tensor]:
+        valid_left = (left_warp.sum(1, keepdim=True) > 0).float()
+        valid_right = (right_warp.sum(1, keepdim=True) > 0).float()
+        right_warp = self._match_intensity_overlap(left_warp, right_warp, valid_left, valid_right, enable=use_overlap_intensity_match)
         x = torch.cat([left_warp, right_warp], dim=1)
 
         e1 = self.enc1(x)
@@ -66,14 +96,14 @@ class SoftSeamFusionUNet(nn.Module):
 
         seam_soft = torch.sigmoid(self.seam_head(d1))
 
-        valid_left = (left_warp.sum(1, keepdim=True) > 0).float()
-        valid_right = (right_warp.sum(1, keepdim=True) > 0).float()
         overlap = valid_left * valid_right
 
-        # fuse seam mask with warp masks (valid supports)
+        # 3-zone logic: seam only affects overlap, non-overlap keeps original ownership.
         seam_in_overlap = seam_soft * overlap
         base_right = seam_in_overlap * valid_right
         refine_right = torch.sigmoid(self.mask_refine(torch.cat([base_right, valid_right], dim=1))) * valid_right
+        smooth_right = F.avg_pool2d(refine_right, kernel_size=5, stride=1, padding=2)
+        refine_right = smooth_right * overlap + valid_right * (1.0 - overlap)
 
         mask_right = refine_right
         mask_left = (1.0 - refine_right) * valid_left

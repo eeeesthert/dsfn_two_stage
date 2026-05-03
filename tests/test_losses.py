@@ -3,6 +3,7 @@ import pytest
 torch = pytest.importorskip("torch")
 
 from abus_pairwise.losses import (
+    fusion_consistency_loss,
     fusion_smoothness_loss,
     grid_angle_loss,
     grid_edge_length_loss,
@@ -49,3 +50,10 @@ def test_nipple_heatmap_alignment_nonnegative():
     lx = torch.tensor([[3.0]])
     rx = torch.tensor([[4.0]])
     assert nipple_heatmap_alignment_loss(l, r, lx, rx) >= 0
+
+
+def test_fusion_consistency_loss_nonnegative():
+    l = torch.rand((1, 3, 16, 16))
+    r = torch.rand((1, 3, 16, 16))
+    s = 0.5 * (l + r)
+    assert fusion_consistency_loss(s, l, r) >= 0
