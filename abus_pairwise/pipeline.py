@@ -138,7 +138,41 @@ def compute_total_loss(
 
 
 def save_stage_results(outputs: dict[str, torch.Tensor], out_dir: str | Path, prefix: str) -> None:
-    save_stage_results_with_crop(outputs, out_dir, prefix, auto_crop=True)
+    # save_stage_results_with_crop(outputs, out_dir, prefix, auto_crop=True)
+    out_dir = Path(out_dir)
+    warp_dir = out_dir / "warp"
+    fusion_dir = out_dir / "fusion"
+    warp_dir.mkdir(parents=True, exist_ok=True)
+    fusion_dir.mkdir(parents=True, exist_ok=True)
+
+    left = outputs["left_warp"].detach().cpu()
+    right = outputs["right_warp"].detach().cpu()
+    stitched = outputs["stitched"].detach().cpu()
+    mask_right = outputs["mask_right"].detach().cpu()
+    seam_soft = outputs["seam_soft"].detach().cpu()
+
+    valid_left = (left.sum(1, keepdim=True) > 0).float()
+    valid_right = (right.sum(1, keepdim=True) > 0).float()
+    valid_union = torch.clamp(valid_left + valid_right, 0, 1)
+    y1, y2, x1, x2 = _bbox_from_valid(valid_union)
+    left = left[:, :, y1:y2, x1:x2]
+    right = right[:, :, y1:y2, x1:x2]
+    stitched = stitched[:, :, y1:y2, x1:x2]
+    mask_right = mask_right[:, :, y1:y2, x1:x2]
+    seam_soft = seam_soft[:, :, y1:y2, x1:x2]
+
+    mask_left = 1.0 - mask_right
+    bin_left = (mask_left > 0.5).float()
+    bin_right = (mask_right > 0.5).float()
+
+    save_image(left, warp_dir / f"{prefix}_left.png")
+    save_image(right, warp_dir / f"{prefix}_right.png")
+    save_image(stitched, fusion_dir / f"{prefix}_stitched.png")
+    save_image(seam_soft, fusion_dir / f"{prefix}_seam_soft.png")
+    save_image(mask_left, fusion_dir / f"{prefix}_mask_left_soft.png")
+    save_image(mask_right, fusion_dir / f"{prefix}_mask_right_soft.png")
+    save_image(bin_left, fusion_dir / f"{prefix}_mask_left_bin.png")
+    save_image(bin_right, fusion_dir / f"{prefix}_mask_right_bin.png")
 
 
 def _bbox_from_valid(valid: torch.Tensor, min_size: int = 8) -> tuple[int, int, int, int]:
