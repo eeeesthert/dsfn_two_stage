@@ -22,7 +22,8 @@ class ConvBlock(nn.Module):
 class SoftSeamFusionUNet(nn.Module):
     """
     Dilated-conv UNet.
-    At skip levels, use |left-right| difference features and concatenate into decoder.
+    At skip levels, use |left-right| difference features computed from the two warped
+    inputs at the same spatial scale, then concatenate into decoder.
     """
 
     def __init__(self):
@@ -37,6 +38,8 @@ class SoftSeamFusionUNet(nn.Module):
         self.dec2 = ConvBlock(128 + 128 + 128, 128, dilation=2)  # up + skip + diff
         self.up1 = nn.ConvTranspose2d(128, 64, 2, stride=2)
         self.dec1 = ConvBlock(64 + 64 + 64, 64, dilation=1)
+        self.diff_proj1 = nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(inplace=True))
+        self.diff_proj2 = nn.Sequential(nn.Conv2d(3, 128, 3, padding=1), nn.ReLU(inplace=True))
 
         self.seam_head = nn.Conv2d(64, 1, 1)
         self.mask_refine = nn.Sequential(
@@ -85,13 +88,21 @@ class SoftSeamFusionUNet(nn.Module):
         up2 = self.up2(b)
         if up2.shape[-2:] != e2.shape[-2:]:
             up2 = F.interpolate(up2, size=e2.shape[-2:], mode="bilinear", align_corners=False)
-        diff2 = (e2 - up2).abs()
+        # diff2 = (e2 - up2).abs()
+        diff_img = (left_warp - right_warp).abs()
+        diff2_img = F.avg_pool2d(diff_img, kernel_size=2, stride=2)
+        diff2 = self.diff_proj2(diff2_img)
+        if diff2.shape[-2:] != e2.shape[-2:]:
+            diff2 = F.interpolate(diff2, size=e2.shape[-2:], mode="bilinear", align_corners=False)
         d2 = self.dec2(torch.cat([up2, e2, diff2], dim=1))
 
         up1 = self.up1(d2)
         if up1.shape[-2:] != e1.shape[-2:]:
             up1 = F.interpolate(up1, size=e1.shape[-2:], mode="bilinear", align_corners=False)
-        diff1 = (e1 - up1).abs()
+        # diff1 = (e1 - up1).abs()
+        diff1 = self.diff_proj1(diff_img)
+        if diff1.shape[-2:] != e1.shape[-2:]:
+            diff1 = F.interpolate(diff1, size=e1.shape[-2:], mode="bilinear", align_corners=False)
         d1 = self.dec1(torch.cat([up1, e1, diff1], dim=1))
 
         seam_soft = torch.sigmoid(self.seam_head(d1))
