@@ -17,6 +17,14 @@ from abus_pairwise.pipeline import (
     save_stage_results,
 )
 
+def save_resume_ckpt(out_dir: str, model: TwoStageStitcher, epoch: int, tag: str) -> Path:
+    ckpt_dir = Path(out_dir) / "checkpoints"
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    p_epoch = ckpt_dir / f"{tag}_epoch_{epoch:03d}.pt"
+    p_latest = ckpt_dir / f"{tag}_latest.pt"
+    torch.save(model.state_dict(), p_epoch)
+    torch.save(model.state_dict(), p_latest)
+    return p_epoch
 
 def build_loss_weights(args: argparse.Namespace) -> LossWeights:
     lw = LossWeights()
@@ -215,6 +223,9 @@ def train_stage(
             f"seam={last_losses['seam_cost'].item():.4f} "
             f"val_total={val_total:.4f}"
         )
+        if args.save_every_epoch:
+            p = save_resume_ckpt(args.out_dir, model, epoch + 1, f"stage{stage}")
+            print(f"[{stage}] saved resume checkpoint: {p}")
 
         if dl_val is not None and bad_epochs >= args.early_stopping_patience:
             print(f"[{stage}] early stopping at epoch {epoch + 1}, best_val={best_val:.4f}")
@@ -316,6 +327,10 @@ def train_interleaved(
             f"val23={stage_val['23'] if stage_val['23'] is not None else -1:.4f} "
             f"val_joint={epoch_val:.4f}"
         )
+        
+        if args.save_every_epoch:
+            p = save_resume_ckpt(args.out_dir, model, epoch + 1, "interleaved")
+            print(f"[12<->23] saved resume checkpoint: {p}")
 
         if val_parts and bad_epochs >= args.early_stopping_patience:
             print(f"[12<->23] early stopping at epoch {epoch + 1}, best_val={best_val:.4f}")
@@ -400,6 +415,7 @@ def main() -> None:
 
     ap.add_argument("--cpu", action="store_true")
     ap.add_argument("--shared-ckpt-name", default="shared_model.pt")
+    ap.add_argument("--save-every-epoch", action="store_true", help="save resume checkpoints every epoch")
     ap.add_argument(
         "--training-schedule",
         choices=["interleaved", "sequential"],
@@ -445,20 +461,32 @@ def main() -> None:
     if torch.cuda.is_available() and not args.cpu:
         torch.cuda.empty_cache()
 
-    if args.training_schedule == "interleaved":
-        train_interleaved(args, model=model, device=device)
-    else:
-        train_stage(args, stage="12", model=model, device=device)
-        train_stage(args, stage="23", model=model, device=device)
+    # if args.training_schedule == "interleaved":
+    #     train_interleaved(args, model=model, device=device)
+    # else:
+    #     train_stage(args, stage="12", model=model, device=device)
+    #     train_stage(args, stage="23", model=model, device=device)
 
-    export_samples(args, stage="12", model=model, device=device)
-    export_samples(args, stage="23", model=model, device=device)
+    # export_samples(args, stage="12", model=model, device=device)
+    # export_samples(args, stage="23", model=model, device=device)
 
     ckpt = Path(args.out_dir) / args.shared_ckpt_name
     ckpt.parent.mkdir(parents=True, exist_ok=True)
 
-    torch.save(model.state_dict(), ckpt)
-    print(f"[train] saved shared checkpoint: {ckpt}")
+    try:
+        if args.training_schedule == "interleaved":
+            train_interleaved(args, model=model, device=device)
+        else:
+            train_stage(args, stage="12", model=model, device=device)
+            train_stage(args, stage="23", model=model, device=device)
+    finally:
+        torch.save(model.state_dict(), ckpt)
+        print(f"[train] saved shared checkpoint (finally): {ckpt}")
+
+    # torch.save(model.state_dict(), ckpt)
+    # print(f"[train] saved shared checkpoint: {ckpt}")
+    export_samples(args, stage="12", model=model, device=device)
+    export_samples(args, stage="23", model=model, device=device)
 
 
 if __name__ == "__main__":
