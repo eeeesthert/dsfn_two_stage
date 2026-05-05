@@ -100,6 +100,17 @@ def seam_cost_loss(left_warp: torch.Tensor, right_warp: torch.Tensor, seam_soft:
     cy = cost[:, :, 1:, :]
     return (gx * cx).mean() + (gy * cy).mean()
 
+def seam_diff_weighted_loss(
+    left_warp: torch.Tensor,
+    right_warp_matched: torch.Tensor,
+    seam_soft: torch.Tensor,
+    overlap: torch.Tensor,
+) -> torch.Tensor:
+    diff = torch.abs(left_warp - right_warp_matched)
+    num = (seam_soft * diff * overlap).sum()
+    den = (seam_soft * overlap).sum().clamp_min(1e-6)
+    return num / den
+
 
 def fusion_smoothness_loss(stitched: torch.Tensor) -> torch.Tensor:
     dx = (stitched[:, :, :, 1:] - stitched[:, :, :, :-1]).abs().mean()
