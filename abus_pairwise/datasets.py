@@ -116,6 +116,15 @@ class ABUSPairDataset(Dataset):
             raise ValueError(f"nipple_x.txt must have 3 values: {path}")
         return vals
 
+
+    @staticmethod
+    def _normalize_intensity(img: torch.Tensor) -> torch.Tensor:
+        mn = torch.amin(img)
+        mx = torch.amax(img)
+        if (mx - mn) <= 1e-6:
+            return torch.zeros_like(img)
+        return (img - mn) / (mx - mn)
+
     def _load_img(self, p: Path) -> torch.Tensor:
         img = cv2.imread(str(p), cv2.IMREAD_COLOR)
         if img is None:
@@ -124,6 +133,7 @@ class ABUSPairDataset(Dataset):
         if self.image_size is not None and self.image_size > 0:
             img = cv2.resize(img, (self.image_size, self.image_size), interpolation=cv2.INTER_LINEAR)
         tensor = torch.from_numpy(img).float().permute(2, 0, 1) / 255.0
+        tensor = self._normalize_intensity(tensor)
         return tensor
 
     def __len__(self) -> int:
