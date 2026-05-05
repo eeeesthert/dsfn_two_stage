@@ -31,12 +31,13 @@ def build_loss_weights(args: argparse.Namespace) -> LossWeights:
     lw.fusion_consistency = args.w_fusion_consistency
     lw.fusion_ssim_main = args.w_fusion_ssim_main
     lw.fusion_ncc = args.w_fusion_ncc
+    lw.seam_diff = args.w_seam_diff
 
     for name in [
         "warp_l1", "grid_edge", "grid_angle", "warp_nipple",
         "seam_boundary", "seam_cost", "fusion_smooth",
         "fusion_nipple", "fusion_consistency",
-        "fusion_ssim_main", "fusion_ncc",
+        "fusion_ssim_main", "fusion_ncc", "seam_diff",
     ]:
         setattr(lw, f"enable_{name}", not getattr(args, f"disable_{name}"))
 
@@ -416,12 +417,13 @@ def main() -> None:
     ap.add_argument("--w-fusion-consistency", type=float, default=0.3)
     ap.add_argument("--w-fusion-ssim-main", type=float, default=2.5)
     ap.add_argument("--w-fusion-ncc", type=float, default=2.5)
+    ap.add_argument("--w-seam-diff", type=float, default=1.0)
 
     for name in [
         "warp_l1", "grid_edge", "grid_angle", "warp_nipple",
         "seam_boundary", "seam_cost", "fusion_smooth",
         "fusion_nipple", "fusion_consistency",
-        "fusion_ssim_main", "fusion_ncc",
+        "fusion_ssim_main", "fusion_ncc", "seam_diff",
     ]:
         ap.add_argument(f"--disable-{name}", action="store_true")
 
