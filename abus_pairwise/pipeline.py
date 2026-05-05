@@ -16,6 +16,7 @@ from .losses import (
     nipple_heatmap_alignment_loss,
     overlap_l1_warp_loss,
     seam_cost_loss,
+    seam_diff_weighted_loss,
     seam_overlap_boundary_loss,
 )
 from .models.fusion import SoftSeamFusionUNet
@@ -65,6 +66,7 @@ class LossWeights:
     fusion_consistency: float = 0.5
     fusion_ssim_main: float = 2.0
     fusion_ncc: float = 2.0
+    seam_diff: float = 1.0
     enable_warp_l1: bool = True
     enable_grid_edge: bool = True
     enable_grid_angle: bool = True
@@ -76,6 +78,7 @@ class LossWeights:
     enable_fusion_consistency: bool = True
     enable_fusion_ssim_main: bool = True
     enable_fusion_ncc: bool = True
+    enable_seam_diff: bool = True
 
 
 def compute_total_loss(
@@ -95,6 +98,9 @@ def compute_total_loss(
     # Fusion-stage losses (4)
     l_boundary = seam_overlap_boundary_loss(outputs["seam_soft"], outputs["overlap"])
     l_seam_cost = seam_cost_loss(outputs["left_warp"], outputs["right_warp"], outputs["seam_soft"])
+    l_seam_diff = seam_diff_weighted_loss(
+        outputs["left_warp"], outputs["right_warp"], outputs["seam_soft"], outputs["overlap"]
+    )
     l_smooth = fusion_smoothness_loss(outputs["stitched"])
     l_nipple_fus = nipple_heatmap_alignment_loss(outputs["stitched"], outputs["right_warp"], left_x, right_x)
     l_fusion_cons = fusion_consistency_loss(outputs["stitched"], outputs["left_warp"], outputs["right_warp"])
@@ -113,6 +119,7 @@ def compute_total_loss(
     total = total + (w.fusion_consistency * l_fusion_cons if w.enable_fusion_consistency else 0.0)
     total = total + (w.fusion_ssim_main * l_fusion_ssim_main if w.enable_fusion_ssim_main else 0.0)
     total = total + (w.fusion_ncc * l_fusion_ncc if w.enable_fusion_ncc else 0.0)
+    total = total + (w.seam_diff * l_seam_diff if w.enable_seam_diff else 0.0)
     return {
         "total": total,
         "warp_l1": l_warp_l1,
@@ -121,6 +128,7 @@ def compute_total_loss(
         "warp_nipple": l_nipple_warp,
         "seam_boundary": l_boundary,
         "seam_cost": l_seam_cost,
+        "seam_diff": l_seam_diff,
         "fusion_smooth": l_smooth,
         "fusion_nipple": l_nipple_fus,
         "fusion_consistency": l_fusion_cons,
@@ -146,49 +154,3 @@ def _bbox_from_valid(valid: torch.Tensor, min_size: int = 8) -> tuple[int, int, 
         y2 = min(h, y1 + min_size)
     if (x2 - x1) < min_size:
         xc = (x1 + x2) // 2
-        x1 = max(0, xc - min_size // 2)
-        x2 = min(w, x1 + min_size)
-    return y1, y2, x1, x2
-
-
-def save_stage_results_with_crop(
-    outputs: dict[str, torch.Tensor],
-    out_dir: str | Path,
-    prefix: str,
-    auto_crop: bool = True,
-) -> None:
-    out_dir = Path(out_dir)
-    warp_dir = out_dir / "warp"
-    fusion_dir = out_dir / "fusion"
-    warp_dir.mkdir(parents=True, exist_ok=True)
-    fusion_dir.mkdir(parents=True, exist_ok=True)
-
-    left = outputs["left_warp"].detach().cpu()
-    right = outputs["right_warp"].detach().cpu()
-    stitched = outputs["stitched"].detach().cpu()
-    mask_right = outputs["mask_right"].detach().cpu()
-    seam_soft = outputs["seam_soft"].detach().cpu()
-
-    if auto_crop:
-        valid_left = (left.sum(1, keepdim=True) > 0).float()
-        valid_right = (right.sum(1, keepdim=True) > 0).float()
-        valid_union = torch.clamp(valid_left + valid_right, 0, 1)
-        y1, y2, x1, x2 = _bbox_from_valid(valid_union)
-        left = left[:, :, y1:y2, x1:x2]
-        right = right[:, :, y1:y2, x1:x2]
-        stitched = stitched[:, :, y1:y2, x1:x2]
-        mask_right = mask_right[:, :, y1:y2, x1:x2]
-        seam_soft = seam_soft[:, :, y1:y2, x1:x2]
-
-    mask_left = 1.0 - mask_right
-    bin_left = (mask_left > 0.5).float()
-    bin_right = (mask_right > 0.5).float()
-
-    save_image(left, warp_dir / f"{prefix}_left.png")
-    save_image(right, warp_dir / f"{prefix}_right.png")
-    save_image(stitched, fusion_dir / f"{prefix}_stitched.png")
-    save_image(seam_soft, fusion_dir / f"{prefix}_seam_soft.png")
-    save_image(mask_left, fusion_dir / f"{prefix}_mask_left_soft.png")
-    save_image(mask_right, fusion_dir / f"{prefix}_mask_right_soft.png")
-    save_image(bin_left, fusion_dir / f"{prefix}_mask_left_bin.png")
-    save_image(bin_right, fusion_dir / f"{prefix}_mask_right_bin.png")
