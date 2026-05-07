@@ -136,66 +136,55 @@ def compute_total_loss(
         "fusion_ncc": l_fusion_ncc,
     }
 
-def save_stage_results_with_crop(
-    outputs: dict[str, torch.Tensor],
-    out_dir: str | Path,
-    prefix: str,
-    auto_crop: bool = True,
-) -> None:
-    out_dir = Path(out_dir)
-    warp_dir = out_dir / "warp"
-    fusion_dir = out_dir / "fusion"
-    warp_dir.mkdir(parents=True, exist_ok=True)
-    fusion_dir.mkdir(parents=True, exist_ok=True)
-
-    left = outputs["left_warp"].detach().cpu()
-    right = outputs["right_warp"].detach().cpu()
-    stitched = outputs["stitched"].detach().cpu()
-    mask_right = outputs["mask_right"].detach().cpu()
-    seam_soft = outputs["seam_soft"].detach().cpu()
-
-    if auto_crop:
-        valid_left = (left.sum(1, keepdim=True) > 0).float()
-        valid_right = (right.sum(1, keepdim=True) > 0).float()
-        valid_union = torch.clamp(valid_left + valid_right, 0, 1)
-        y1, y2, x1, x2 = _bbox_from_valid(valid_union)
-        left = left[:, :, y1:y2, x1:x2]
-        right = right[:, :, y1:y2, x1:x2]
-        stitched = stitched[:, :, y1:y2, x1:x2]
-        mask_right = mask_right[:, :, y1:y2, x1:x2]
-        seam_soft = seam_soft[:, :, y1:y2, x1:x2]
-
-    mask_left = 1.0 - mask_right
-    bin_left = (mask_left > 0.5).float()
-    bin_right = (mask_right > 0.5).float()
-
-    save_image(left, warp_dir / f"{prefix}_left.png")
-    save_image(right, warp_dir / f"{prefix}_right.png")
-    save_image(stitched, fusion_dir / f"{prefix}_stitched.png")
-    save_image(seam_soft, fusion_dir / f"{prefix}_seam_soft.png")
-    save_image(mask_left, fusion_dir / f"{prefix}_mask_left_soft.png")
-    save_image(mask_right, fusion_dir / f"{prefix}_mask_right_soft.png")
-    save_image(bin_left, fusion_dir / f"{prefix}_mask_left_bin.png")
-    save_image(bin_right, fusion_dir / f"{prefix}_mask_right_bin.png")
-def save_stage_results(outputs: dict[str, torch.Tensor], out_dir: str | Path, prefix: str) -> None:
-    save_stage_results_with_crop(outputs, out_dir, prefix, auto_crop=True)
-
-
 def _bbox_from_valid(valid: torch.Tensor, min_size: int = 8) -> tuple[int, int, int, int]:
-    ys, xs = torch.where(valid[0, 0] > 0)
+    """
+    根据 valid mask 计算自动裁剪框。
+    valid: [B, 1, H, W] 或 [1, 1, H, W]
+    返回 y1, y2, x1, x2。
+
+    关键修复：
+    1. valid 全空时返回整图，不返回 None；
+    2. 防止裁剪框过小；
+    3. 防止非法 bbox。
+    """
+    if valid is None:
+        raise ValueError("valid is None in _bbox_from_valid")
+
+    if valid.ndim != 4:
+        raise ValueError(f"valid should be 4D [B,1,H,W], got shape={tuple(valid.shape)}")
+
     h, w = valid.shape[-2:]
-    if ys.numel() == 0:
+
+    mask = valid[0, 0] > 0
+    ys, xs = torch.where(mask)
+
+    # 核心兜底：有效区域为空时，直接返回整图
+    if ys.numel() == 0 or xs.numel() == 0:
         return 0, h, 0, w
-    y1, y2 = int(ys.min().item()), int(ys.max().item()) + 1
-    x1, x2 = int(xs.min().item()), int(xs.max().item()) + 1
+
+    y1 = int(ys.min().item())
+    y2 = int(ys.max().item()) + 1
+    x1 = int(xs.min().item())
+    x2 = int(xs.max().item()) + 1
+
+    # 防止 bbox 高度过小
     if (y2 - y1) < min_size:
         yc = (y1 + y2) // 2
         y1 = max(0, yc - min_size // 2)
         y2 = min(h, y1 + min_size)
+
+    # 防止 bbox 宽度过小
     if (x2 - x1) < min_size:
         xc = (x1 + x2) // 2
         x1 = max(0, xc - min_size // 2)
         x2 = min(w, x1 + min_size)
+
+    # 二次修正，防止边界情况下仍然为空
+    if y2 <= y1:
+        y1, y2 = 0, h
+    if x2 <= x1:
+        x1, x2 = 0, w
+
     return y1, y2, x1, x2
 
 
@@ -205,11 +194,25 @@ def save_stage_results_with_crop(
     prefix: str,
     auto_crop: bool = True,
 ) -> None:
+    """
+    保存 warp / fusion 阶段结果。
+
+    修复点：
+    1. 自动裁剪不再因为 valid_union 为空而崩溃；
+    2. 有效区域使用 abs()>eps，而不是 sum()>0；
+    3. 缺失某些 key 时给出更明确报错；
+    4. 避免重复函数定义。
+    """
     out_dir = Path(out_dir)
     warp_dir = out_dir / "warp"
     fusion_dir = out_dir / "fusion"
     warp_dir.mkdir(parents=True, exist_ok=True)
     fusion_dir.mkdir(parents=True, exist_ok=True)
+
+    required_keys = ["left_warp", "right_warp", "stitched", "mask_right", "seam_soft"]
+    for k in required_keys:
+        if k not in outputs:
+            raise KeyError(f"outputs missing required key: {k}")
 
     left = outputs["left_warp"].detach().cpu()
     right = outputs["right_warp"].detach().cpu()
@@ -218,10 +221,16 @@ def save_stage_results_with_crop(
     seam_soft = outputs["seam_soft"].detach().cpu()
 
     if auto_crop:
-        valid_left = (left.sum(1, keepdim=True) > 0).float()
-        valid_right = (right.sum(1, keepdim=True) > 0).float()
+        eps = 1e-6
+
+        # 原来是 left.sum(1)>0，不稳。
+        # 这里改成 abs 后按通道求和，适配 [0,1]、[-1,1]、以及轻微负值情况。
+        valid_left = (left.abs().sum(dim=1, keepdim=True) > eps).float()
+        valid_right = (right.abs().sum(dim=1, keepdim=True) > eps).float()
         valid_union = torch.clamp(valid_left + valid_right, 0, 1)
+
         y1, y2, x1, x2 = _bbox_from_valid(valid_union)
+
         left = left[:, :, y1:y2, x1:x2]
         right = right[:, :, y1:y2, x1:x2]
         stitched = stitched[:, :, y1:y2, x1:x2]
@@ -240,3 +249,11 @@ def save_stage_results_with_crop(
     save_image(mask_right, fusion_dir / f"{prefix}_mask_right_soft.png")
     save_image(bin_left, fusion_dir / f"{prefix}_mask_left_bin.png")
     save_image(bin_right, fusion_dir / f"{prefix}_mask_right_bin.png")
+
+
+def save_stage_results(
+    outputs: dict[str, torch.Tensor],
+    out_dir: str | Path,
+    prefix: str,
+) -> None:
+    save_stage_results_with_crop(outputs, out_dir, prefix, auto_crop=True)
