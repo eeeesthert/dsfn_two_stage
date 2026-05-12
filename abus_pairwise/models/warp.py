@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .encoder import ResNet50MultiScale
+from .encoder import MultiScaleEncoder
 
 
 def _build_dlt_homography(src: torch.Tensor, dst: torch.Tensor) -> torch.Tensor:
@@ -102,12 +102,13 @@ class WarpStage(nn.Module):
         encoder_ckpt: str | None = None,
         encoder_radimagenet_url: str | None = None,
         encoder_strict_load: bool = False,
+        encoder_name: str = "resnet50",
         grid_h: int = 9,
         grid_w: int = 9,
         local_refine_mode: str = "tps",
     ):
         super().__init__()
-        self.encoder = ResNet50MultiScale(
+        self.encoder = MultiScaleEncoder(name=encoder_name,
             pretrain_source=encoder_pretrain_source,
             checkpoint_path=encoder_ckpt,
             radimagenet_url=encoder_radimagenet_url,

@@ -18,6 +18,7 @@ from .losses import (
     seam_cost_loss,
     seam_diff_weighted_loss,
     seam_overlap_boundary_loss,
+    overlap_boundary_diff_loss,
 )
 from .models.fusion import SoftSeamFusionUNet
 from .models.warp import WarpStage
@@ -30,6 +31,9 @@ class TwoStageStitcher(torch.nn.Module):
         encoder_ckpt: str | None = None,
         encoder_radimagenet_url: str | None = None,
         encoder_strict_load: bool = False,
+        encoder_name: str = "resnet50",
+        apply_clahe_before_input: bool = False,
+        apply_clahe_before_fusion: bool = False,
     ):
         super().__init__()
         self.warp_net = WarpStage(
@@ -37,8 +41,19 @@ class TwoStageStitcher(torch.nn.Module):
             encoder_ckpt=encoder_ckpt,
             encoder_radimagenet_url=encoder_radimagenet_url,
             encoder_strict_load=encoder_strict_load,
+            encoder_name=encoder_name,
         )
         self.fusion_net = SoftSeamFusionUNet()
+        self.apply_clahe_before_input = apply_clahe_before_input
+        self.apply_clahe_before_fusion = apply_clahe_before_fusion
+
+    @staticmethod
+    def _clahe_tensor(x: torch.Tensor) -> torch.Tensor:
+        # lightweight differentiable-ish local contrast by per-channel local normalization
+        mu = torch.nn.functional.avg_pool2d(x, kernel_size=9, stride=1, padding=4)
+        sigma = torch.sqrt(torch.nn.functional.avg_pool2d((x - mu) ** 2, kernel_size=9, stride=1, padding=4) + 1e-6)
+        y = (x - mu) / (sigma + 1e-6)
+        return torch.sigmoid(y)
 
     def forward(
         self,
@@ -47,8 +62,16 @@ class TwoStageStitcher(torch.nn.Module):
         left_x: torch.Tensor | None = None,
         right_x: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
+        if self.apply_clahe_before_input:
+            left = self._clahe_tensor(left)
+            right = self._clahe_tensor(right)
         warp_out = self.warp_net(left, right, left_x=left_x, right_x=right_x)
-        fus_out = self.fusion_net(warp_out["left_warp"], warp_out["right_warp"], use_overlap_intensity_match=True)
+        left_fus = warp_out["left_warp"]
+        right_fus = warp_out["right_warp"]
+        if self.apply_clahe_before_fusion:
+            left_fus = self._clahe_tensor(left_fus)
+            right_fus = self._clahe_tensor(right_fus)
+        fus_out = self.fusion_net(left_fus, right_fus, use_overlap_intensity_match=True)
         return {**warp_out, **fus_out}
 
 
@@ -98,8 +121,8 @@ def compute_total_loss(
     # Fusion-stage losses (4)
     l_boundary = seam_overlap_boundary_loss(outputs["seam_soft"], outputs["overlap"])
     l_seam_cost = seam_cost_loss(outputs["left_warp"], outputs["right_warp"], outputs["seam_soft"])
-    l_seam_diff = seam_diff_weighted_loss(
-        outputs["left_warp"], outputs["right_warp"], outputs["seam_soft"], outputs["overlap"]
+    l_seam_diff = overlap_boundary_diff_loss(
+        outputs["left_warp"], outputs["right_warp"], outputs["mask_left"], outputs["mask_right"]
     )
     l_smooth = fusion_smoothness_loss(outputs["stitched"])
     l_nipple_fus = nipple_heatmap_alignment_loss(outputs["stitched"], outputs["right_warp"], left_x, right_x)
