@@ -49,6 +49,10 @@ def build_loss_weights(args: argparse.Namespace) -> LossWeights:
     ]:
         setattr(lw, f"enable_{name}", not getattr(args, f"disable_{name}"))
 
+    # No seam-search losses: use overlap boundary diff only.
+    lw.enable_seam_boundary = False
+    lw.enable_seam_cost = False
+
     return lw
 
 
@@ -214,15 +218,8 @@ def train_stage(
         else:
             bad_epochs += 1
 
-        print(
-            f"[{stage}] epoch={epoch + 1}/{args.epochs} "
-            f"total={last_losses['total'].item():.4f} "
-            f"warp_l1={last_losses['warp_l1'].item():.4f} "
-            f"edge={last_losses['grid_edge'].item():.4f} "
-            f"angle={last_losses['grid_angle'].item():.4f} "
-            f"seam={last_losses['seam_cost'].item():.4f} "
-            f"val_total={val_total:.4f}"
-        )
+        loss_log = " ".join([f"{k}={v.item():.4f}" for k, v in last_losses.items()])
+        print(f"[{stage}] epoch={epoch + 1}/{args.epochs} {loss_log} val_total={val_total:.4f}")
         if args.save_every_epoch:
             p = save_resume_ckpt(args.out_dir, model, epoch + 1, f"stage{stage}")
             print(f"[{stage}] saved resume checkpoint: {p}")
@@ -319,10 +316,11 @@ def train_interleaved(
         l12 = stage_last_loss.get("12", {"total": -1.0})
         l23 = stage_last_loss.get("23", {"total": -1.0})
 
+        l12_log = " ".join([f"12_{k}={v:.4f}" for k, v in l12.items()])
+        l23_log = " ".join([f"23_{k}={v:.4f}" for k, v in l23.items()])
         print(
             f"[12<->23] epoch={epoch + 1}/{args.epochs} "
-            f"12_total={l12['total']:.4f} "
-            f"23_total={l23['total']:.4f} "
+            f"{l12_log} {l23_log} "
             f"val12={stage_val['12'] if stage_val['12'] is not None else -1:.4f} "
             f"val23={stage_val['23'] if stage_val['23'] is not None else -1:.4f} "
             f"val_joint={epoch_val:.4f}"
@@ -412,6 +410,9 @@ def main() -> None:
         help="optional URL for auto-downloading RadImageNet weights",
     )
     ap.add_argument("--encoder-strict-load", action="store_true")
+    ap.add_argument("--encoder-name", choices=["resnet50", "densenet121"], default="resnet50")
+    ap.add_argument("--apply-clahe-before-input", action="store_true")
+    ap.add_argument("--apply-clahe-before-fusion", action="store_true")
 
     ap.add_argument("--cpu", action="store_true")
     ap.add_argument("--shared-ckpt-name", default="shared_model.pt")
@@ -456,6 +457,9 @@ def main() -> None:
         encoder_ckpt=args.encoder_ckpt,
         encoder_radimagenet_url=args.radimagenet_url,
         encoder_strict_load=args.encoder_strict_load,
+        encoder_name=args.encoder_name,
+        apply_clahe_before_input=args.apply_clahe_before_input,
+        apply_clahe_before_fusion=args.apply_clahe_before_fusion,
     ).to(device)
 
     if torch.cuda.is_available() and not args.cpu:
