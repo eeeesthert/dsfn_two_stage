@@ -15,9 +15,6 @@ from .losses import (
     grid_edge_length_loss,
     nipple_heatmap_alignment_loss,
     overlap_l1_warp_loss,
-    seam_cost_loss,
-    seam_diff_weighted_loss,
-    seam_overlap_boundary_loss,
     overlap_boundary_diff_loss,
 )
 from .models.fusion import SoftSeamFusionUNet
@@ -119,9 +116,7 @@ def compute_total_loss(
     l_nipple_warp = nipple_heatmap_alignment_loss(outputs["left_warp"], outputs["right_warp"], left_x, right_x)
 
     # Fusion-stage losses (4)
-    l_boundary = seam_overlap_boundary_loss(outputs["seam_soft"], outputs["overlap"])
-    l_seam_cost = seam_cost_loss(outputs["left_warp"], outputs["right_warp"], outputs["seam_soft"])
-    l_seam_diff = overlap_boundary_diff_loss(
+    l_boundary_diff = overlap_boundary_diff_loss(
         outputs["left_warp"], outputs["right_warp"], outputs["mask_left"], outputs["mask_right"]
     )
     l_smooth = fusion_smoothness_loss(outputs["stitched"])
@@ -135,23 +130,20 @@ def compute_total_loss(
     total = total + (w.grid_edge * l_edge if w.enable_grid_edge else 0.0)
     total = total + (w.grid_angle * l_angle if w.enable_grid_angle else 0.0)
     total = total + (w.warp_nipple * l_nipple_warp if w.enable_warp_nipple else 0.0)
-    total = total + (w.seam_boundary * l_boundary if w.enable_seam_boundary else 0.0)
-    total = total + (w.seam_cost * l_seam_cost if w.enable_seam_cost else 0.0)
+    # seam-search losses are intentionally disabled in this setting.
     total = total + (w.fusion_smooth * l_smooth if w.enable_fusion_smooth else 0.0)
     total = total + (w.fusion_nipple * l_nipple_fus if w.enable_fusion_nipple else 0.0)
     total = total + (w.fusion_consistency * l_fusion_cons if w.enable_fusion_consistency else 0.0)
     total = total + (w.fusion_ssim_main * l_fusion_ssim_main if w.enable_fusion_ssim_main else 0.0)
     total = total + (w.fusion_ncc * l_fusion_ncc if w.enable_fusion_ncc else 0.0)
-    total = total + (w.seam_diff * l_seam_diff if w.enable_seam_diff else 0.0)
+    total = total + (w.seam_diff * l_boundary_diff if w.enable_seam_diff else 0.0)
     return {
         "total": total,
         "warp_l1": l_warp_l1,
         "grid_edge": l_edge,
         "grid_angle": l_angle,
         "warp_nipple": l_nipple_warp,
-        "seam_boundary": l_boundary,
-        "seam_cost": l_seam_cost,
-        "seam_diff": l_seam_diff,
+        "boundary_diff": l_boundary_diff,
         "fusion_smooth": l_smooth,
         "fusion_nipple": l_nipple_fus,
         "fusion_consistency": l_fusion_cons,
