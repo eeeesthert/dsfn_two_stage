@@ -114,9 +114,9 @@ class WarpStage(nn.Module):
             radimagenet_url=encoder_radimagenet_url,
             strict_load=encoder_strict_load,
         )
-        self.fca = FCA(c=1024)
+        self.fca = FCA(c=self.encoder.out_channels[2])
         self.rr = RR(c=256)
-        self.local_head = LocalGridHead(c=512, gh=grid_h, gw=grid_w)
+        self.local_head = LocalGridHead(c=self.encoder.out_channels[1], gh=grid_h, gw=grid_w)
         self.grid_h, self.grid_w = grid_h, grid_w
         self.local_refine_mode = local_refine_mode
 

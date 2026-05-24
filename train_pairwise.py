@@ -17,6 +17,14 @@ from abus_pairwise.pipeline import (
     save_stage_results,
 )
 
+
+def _append_log_line(log_file: Path | None, line: str) -> None:
+    if log_file is None:
+        return
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    with log_file.open("a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
 def save_resume_ckpt(out_dir: str, model: TwoStageStitcher, epoch: int, tag: str) -> Path:
     ckpt_dir = Path(out_dir) / "checkpoints"
     ckpt_dir.mkdir(parents=True, exist_ok=True)
@@ -171,6 +179,9 @@ def train_stage(
     bad_epochs = 0
     best_state = copy.deepcopy(model.state_dict())
 
+    loss_log_file = Path(args.out_dir) / args.loss_log_name
+    _append_log_line(loss_log_file, f"# stage={stage} training log")
+
     for epoch in range(args.epochs):
         model.train()
         optim.zero_grad()
@@ -219,7 +230,9 @@ def train_stage(
             bad_epochs += 1
 
         loss_log = " ".join([f"{k}={v.item():.4f}" for k, v in last_losses.items()])
-        print(f"[{stage}] epoch={epoch + 1}/{args.epochs} {loss_log} val_total={val_total:.4f}")
+        line = f"[{stage}] epoch={epoch + 1}/{args.epochs} {loss_log} val_total={val_total:.4f}"
+        print(line)
+        _append_log_line(loss_log_file, line)
         if args.save_every_epoch:
             p = save_resume_ckpt(args.out_dir, model, epoch + 1, f"stage{stage}")
             print(f"[{stage}] saved resume checkpoint: {p}")
@@ -251,6 +264,9 @@ def train_interleaved(
     best_val = float("inf")
     bad_epochs = 0
     best_state = copy.deepcopy(model.state_dict())
+
+    loss_log_file = Path(args.out_dir) / args.loss_log_name
+    _append_log_line(loss_log_file, "# stage=interleaved training log")
 
     for epoch in range(args.epochs):
         model.train()
@@ -318,13 +334,15 @@ def train_interleaved(
 
         l12_log = " ".join([f"12_{k}={v:.4f}" for k, v in l12.items()])
         l23_log = " ".join([f"23_{k}={v:.4f}" for k, v in l23.items()])
-        print(
+        line = (
             f"[12<->23] epoch={epoch + 1}/{args.epochs} "
             f"{l12_log} {l23_log} "
             f"val12={stage_val['12'] if stage_val['12'] is not None else -1:.4f} "
             f"val23={stage_val['23'] if stage_val['23'] is not None else -1:.4f} "
             f"val_joint={epoch_val:.4f}"
         )
+        print(line)
+        _append_log_line(loss_log_file, line)
         
         if args.save_every_epoch:
             p = save_resume_ckpt(args.out_dir, model, epoch + 1, "interleaved")
@@ -410,13 +428,14 @@ def main() -> None:
         help="optional URL for auto-downloading RadImageNet weights",
     )
     ap.add_argument("--encoder-strict-load", action="store_true")
-    ap.add_argument("--encoder-name", choices=["resnet50", "densenet121"], default="resnet50")
+    ap.add_argument("--encoder-name", choices=["resnet50", "densenet121", "inceptionv3"], default="resnet50")
     ap.add_argument("--apply-clahe-before-input", action="store_true")
     ap.add_argument("--apply-clahe-before-fusion", action="store_true")
 
     ap.add_argument("--cpu", action="store_true")
     ap.add_argument("--shared-ckpt-name", default="shared_model.pt")
     ap.add_argument("--save-every-epoch", action="store_true", help="save resume checkpoints every epoch")
+    ap.add_argument("--loss-log-name", default="train_loss.log", help="loss log file name under out-dir")
     ap.add_argument(
         "--training-schedule",
         choices=["interleaved", "sequential"],

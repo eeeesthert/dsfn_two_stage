@@ -8,8 +8,10 @@ import torch
 import torch.nn as nn
 from torchvision.models import (
     DenseNet121_Weights,
+    Inception_V3_Weights,
     ResNet50_Weights,
     densenet121,
+    inception_v3,
     resnet50,
 )
 
@@ -40,7 +42,7 @@ class MultiScaleEncoder(nn.Module):
         super().__init__()
         self.name = name.lower()
         source = pretrain_source.lower()
-        if self.name not in {"resnet50", "densenet121"}:
+        if self.name not in {"resnet50", "densenet121", "inceptionv3"}:
             raise ValueError(f"Unsupported encoder: {name}")
         if source not in {"imagenet", "radimagenet", "local", "none"}:
             raise ValueError(f"Unsupported pretrain source: {pretrain_source}")
@@ -56,7 +58,7 @@ class MultiScaleEncoder(nn.Module):
             self.stem = nn.Sequential(base.conv1, base.bn1, base.relu, base.maxpool)
             self.layer1, self.layer2, self.layer3, self.layer4 = base.layer1, base.layer2, base.layer3, base.layer4
             self.out_channels = [256, 512, 1024, 2048]
-        else:
+        elif self.name == "densenet121":
             base = densenet121(weights=DenseNet121_Weights.IMAGENET1K_V1 if source in {"imagenet", "radimagenet"} else None)
             if source in {"radimagenet", "local"}:
                 ckpt = self._load_external_ckpt(source, checkpoint_path, radimagenet_url)
@@ -65,6 +67,16 @@ class MultiScaleEncoder(nn.Module):
                     base.load_state_dict(sd, strict=strict_load)
             self.features = base.features
             self.out_channels = [256, 512, 1024, 1024]
+        else:
+            base = inception_v3(weights=Inception_V3_Weights.IMAGENET1K_V1 if source in {"imagenet", "radimagenet"} else None, aux_logits=False)
+            if source in {"radimagenet", "local"}:
+                ckpt = self._load_external_ckpt(source, checkpoint_path, radimagenet_url)
+                if ckpt is not None:
+                    sd = _strip_prefixes(_extract_state_dict(ckpt))
+                    sd = {k: v for k, v in sd.items() if not k.startswith("fc.") and not k.startswith("AuxLogits.")}
+                    base.load_state_dict(sd, strict=strict_load)
+            self.inception = base
+            self.out_channels = [192, 288, 768, 2048]
 
     def _load_external_ckpt(self, source: str, checkpoint_path: str | None, radimagenet_url: str | None):
         if source == "radimagenet" and checkpoint_path is None:
@@ -85,19 +97,45 @@ class MultiScaleEncoder(nn.Module):
             f4 = self.layer4(f3)
             return [f1, f2, f3, f4]
 
-        x = self.features.conv0(x)
-        x = self.features.norm0(x)
-        x = self.features.relu0(x)
-        x = self.features.pool0(x)
-        x = self.features.denseblock1(x)
-        x = self.features.transition1(x)
+        if self.name == "densenet121":
+            x = self.features.conv0(x)
+            x = self.features.norm0(x)
+            x = self.features.relu0(x)
+            x = self.features.pool0(x)
+            x = self.features.denseblock1(x)
+            x = self.features.transition1(x)
+            f1 = x
+            x = self.features.denseblock2(x)
+            x = self.features.transition2(x)
+            f2 = x
+            x = self.features.denseblock3(x)
+            x = self.features.transition3(x)
+            f3 = x
+            x = self.features.denseblock4(x)
+            f4 = x
+            return [f1, f2, f3, f4]
+
+        # inceptionv3
+        x = self.inception.Conv2d_1a_3x3(x)
+        x = self.inception.Conv2d_2a_3x3(x)
+        x = self.inception.Conv2d_2b_3x3(x)
+        x = self.inception.maxpool1(x)
+        x = self.inception.Conv2d_3b_1x1(x)
+        x = self.inception.Conv2d_4a_3x3(x)
+        x = self.inception.maxpool2(x)
         f1 = x
-        x = self.features.denseblock2(x)
-        x = self.features.transition2(x)
+        x = self.inception.Mixed_5b(x)
+        x = self.inception.Mixed_5c(x)
+        x = self.inception.Mixed_5d(x)
         f2 = x
-        x = self.features.denseblock3(x)
-        x = self.features.transition3(x)
+        x = self.inception.Mixed_6a(x)
+        x = self.inception.Mixed_6b(x)
+        x = self.inception.Mixed_6c(x)
+        x = self.inception.Mixed_6d(x)
+        x = self.inception.Mixed_6e(x)
         f3 = x
-        x = self.features.denseblock4(x)
+        x = self.inception.Mixed_7a(x)
+        x = self.inception.Mixed_7b(x)
+        x = self.inception.Mixed_7c(x)
         f4 = x
         return [f1, f2, f3, f4]
