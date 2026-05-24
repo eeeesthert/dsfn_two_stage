@@ -112,6 +112,18 @@ def seam_diff_weighted_loss(
     return num / den
 
 
+def overlap_boundary_diff_loss(
+    left_warp: torch.Tensor,
+    right_warp: torch.Tensor,
+    mask_left_soft: torch.Tensor,
+    mask_right_soft: torch.Tensor,
+) -> torch.Tensor:
+    """Use soft-mask overlap boundary as seam and penalize two-side difference."""
+    overlap = (mask_left_soft * mask_right_soft).clamp_min(0.0)
+    diff = (left_warp - right_warp).abs().mean(1, keepdim=True)
+    return (diff * overlap).sum() / overlap.sum().clamp_min(1.0)
+
+
 def fusion_smoothness_loss(stitched: torch.Tensor) -> torch.Tensor:
     dx = (stitched[:, :, :, 1:] - stitched[:, :, :, :-1]).abs().mean()
     dy = (stitched[:, :, 1:, :] - stitched[:, :, :-1, :]).abs().mean()

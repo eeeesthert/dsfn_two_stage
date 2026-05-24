@@ -6,7 +6,14 @@ from typing import Any
 
 import torch
 import torch.nn as nn
-from torchvision.models import resnet50, ResNet50_Weights
+from torchvision.models import (
+    DenseNet121_Weights,
+    Inception_V3_Weights,
+    ResNet50_Weights,
+    densenet121,
+    inception_v3,
+    resnet50,
+)
 
 
 def _extract_state_dict(obj: Any) -> dict[str, torch.Tensor]:
@@ -14,89 +21,121 @@ def _extract_state_dict(obj: Any) -> dict[str, torch.Tensor]:
         for k in ("state_dict", "model", "net", "weights"):
             if k in obj and isinstance(obj[k], dict):
                 return obj[k]
-        # Maybe already a state-dict
         if all(isinstance(v, torch.Tensor) for v in obj.values()):
-            return obj  # type: ignore[return-value]
+            return obj
     raise ValueError("Cannot parse checkpoint format: expected a state_dict-like object.")
 
 
-def _adapt_resnet50_keys(sd: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-    out: dict[str, torch.Tensor] = {}
+def _strip_prefixes(sd: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+    out = {}
     for k, v in sd.items():
         nk = k
-        # common wrappers
-        for prefix in ("module.", "encoder.", "backbone.", "resnet.", "model."):
+        for prefix in ("module.", "encoder.", "backbone.", "resnet.", "densenet.", "model."):
             if nk.startswith(prefix):
                 nk = nk[len(prefix):]
-        if nk.startswith("fc."):
-            continue
         out[nk] = v
     return out
 
 
-class ResNet50MultiScale(nn.Module):
-    """ResNet50 feature pyramid compatible with warp/fusion stages."""
-
-    def __init__(
-        self,
-        pretrain_source: str = "imagenet",
-        checkpoint_path: str | None = None,
-        radimagenet_url: str | None = None,
-        strict_load: bool = False,
-    ):
+class MultiScaleEncoder(nn.Module):
+    def __init__(self, name: str = "resnet50", pretrain_source: str = "imagenet", checkpoint_path: str | None = None, radimagenet_url: str | None = None, strict_load: bool = False):
         super().__init__()
+        self.name = name.lower()
         source = pretrain_source.lower()
+        if self.name not in {"resnet50", "densenet121", "inceptionv3"}:
+            raise ValueError(f"Unsupported encoder: {name}")
         if source not in {"imagenet", "radimagenet", "local", "none"}:
             raise ValueError(f"Unsupported pretrain source: {pretrain_source}")
 
-        # ImageNet source can download automatically from torchvision.
-        # For radimagenet, we support optional URL-based auto-download via env var.
-        if source in {"imagenet", "radimagenet"}:
-            weights = ResNet50_Weights.IMAGENET1K_V2
+        if self.name == "resnet50":
+            base = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2 if source in {"imagenet", "radimagenet"} else None)
+            if source in {"radimagenet", "local"}:
+                ckpt = self._load_external_ckpt(source, checkpoint_path, radimagenet_url)
+                if ckpt is not None:
+                    sd = _strip_prefixes(_extract_state_dict(ckpt))
+                    sd = {k: v for k, v in sd.items() if not k.startswith("fc.")}
+                    base.load_state_dict(sd, strict=strict_load)
+            self.stem = nn.Sequential(base.conv1, base.bn1, base.relu, base.maxpool)
+            self.layer1, self.layer2, self.layer3, self.layer4 = base.layer1, base.layer2, base.layer3, base.layer4
+            self.out_channels = [256, 512, 1024, 2048]
+        elif self.name == "densenet121":
+            base = densenet121(weights=DenseNet121_Weights.IMAGENET1K_V1 if source in {"imagenet", "radimagenet"} else None)
+            if source in {"radimagenet", "local"}:
+                ckpt = self._load_external_ckpt(source, checkpoint_path, radimagenet_url)
+                if ckpt is not None:
+                    sd = _strip_prefixes(_extract_state_dict(ckpt))
+                    base.load_state_dict(sd, strict=strict_load)
+            self.features = base.features
+            self.out_channels = [256, 512, 1024, 1024]
         else:
-            weights = None
-        base = resnet50(weights=weights)
-        if source in {"radimagenet", "local"}:
-            if source == "radimagenet" and checkpoint_path is None:
-                url = (radimagenet_url or "").strip() or os.getenv("RADIMAGENET_RESNET50_URL", "").strip()
-                if url:
-                    print(f"[encoder] downloading radimagenet checkpoint from: {url}")
-                    ckpt = torch.hub.load_state_dict_from_url(url, map_location="cpu", progress=True)
-                    sd = _adapt_resnet50_keys(_extract_state_dict(ckpt))
-                    missing, unexpected = base.load_state_dict(sd, strict=strict_load)
-                    if len(unexpected) > 0:
-                        print(f"[encoder] unexpected keys ignored: {len(unexpected)}")
-                    if len(missing) > 0:
-                        print(f"[encoder] missing keys after load: {len(missing)}")
-                    checkpoint_path = "__downloaded__"
-                else:
-                    print(
-                        "[encoder] RADIMAGENET_RESNET50_URL is not set, "
-                        "fallback to torchvision ImageNet weights. "
-                        "Set --encoder-ckpt or env var to use real RadImageNet weights."
-                    )
-                    checkpoint_path = "__imagenet_fallback__"
-            if checkpoint_path is None:
-                raise ValueError(f"{source} source requires --encoder-ckpt path.")
-            if checkpoint_path not in {"__downloaded__", "__imagenet_fallback__"}:
-                ckpt = torch.load(Path(checkpoint_path), map_location="cpu")
-                sd = _adapt_resnet50_keys(_extract_state_dict(ckpt))
-                missing, unexpected = base.load_state_dict(sd, strict=strict_load)
-                if len(unexpected) > 0:
-                    print(f"[encoder] unexpected keys ignored: {len(unexpected)}")
-                if len(missing) > 0:
-                    print(f"[encoder] missing keys after load: {len(missing)}")
+            base = inception_v3(weights=Inception_V3_Weights.IMAGENET1K_V1 if source in {"imagenet", "radimagenet"} else None, aux_logits=False)
+            if source in {"radimagenet", "local"}:
+                ckpt = self._load_external_ckpt(source, checkpoint_path, radimagenet_url)
+                if ckpt is not None:
+                    sd = _strip_prefixes(_extract_state_dict(ckpt))
+                    sd = {k: v for k, v in sd.items() if not k.startswith("fc.") and not k.startswith("AuxLogits.")}
+                    base.load_state_dict(sd, strict=strict_load)
+            self.inception = base
+            self.out_channels = [192, 288, 768, 2048]
 
-        self.stem = nn.Sequential(base.conv1, base.bn1, base.relu, base.maxpool)
-        self.layer1 = base.layer1
-        self.layer2 = base.layer2
-        self.layer3 = base.layer3
-        self.layer4 = base.layer4
+    def _load_external_ckpt(self, source: str, checkpoint_path: str | None, radimagenet_url: str | None):
+        if source == "radimagenet" and checkpoint_path is None:
+            url = (radimagenet_url or "").strip() or os.getenv("RADIMAGENET_URL", "").strip()
+            if url:
+                return torch.hub.load_state_dict_from_url(url, map_location="cpu", progress=True)
+            return None
+        if checkpoint_path is None:
+            raise ValueError(f"{source} source requires --encoder-ckpt path.")
+        return torch.load(Path(checkpoint_path), map_location="cpu")
 
     def forward(self, x: torch.Tensor) -> list[torch.Tensor]:
-        x = self.stem(x)
-        f1 = self.layer1(x)   # 1/4
-        f2 = self.layer2(f1)  # 1/8
-        f3 = self.layer3(f2)  # 1/16
-        f4 = self.layer4(f3)  # 1/32
+        if self.name == "resnet50":
+            x = self.stem(x)
+            f1 = self.layer1(x)
+            f2 = self.layer2(f1)
+            f3 = self.layer3(f2)
+            f4 = self.layer4(f3)
+            return [f1, f2, f3, f4]
+
+        if self.name == "densenet121":
+            x = self.features.conv0(x)
+            x = self.features.norm0(x)
+            x = self.features.relu0(x)
+            x = self.features.pool0(x)
+            x = self.features.denseblock1(x)
+            x = self.features.transition1(x)
+            f1 = x
+            x = self.features.denseblock2(x)
+            x = self.features.transition2(x)
+            f2 = x
+            x = self.features.denseblock3(x)
+            x = self.features.transition3(x)
+            f3 = x
+            x = self.features.denseblock4(x)
+            f4 = x
+            return [f1, f2, f3, f4]
+
+        # inceptionv3
+        x = self.inception.Conv2d_1a_3x3(x)
+        x = self.inception.Conv2d_2a_3x3(x)
+        x = self.inception.Conv2d_2b_3x3(x)
+        x = self.inception.maxpool1(x)
+        x = self.inception.Conv2d_3b_1x1(x)
+        x = self.inception.Conv2d_4a_3x3(x)
+        x = self.inception.maxpool2(x)
+        f1 = x
+        x = self.inception.Mixed_5b(x)
+        x = self.inception.Mixed_5c(x)
+        x = self.inception.Mixed_5d(x)
+        f2 = x
+        x = self.inception.Mixed_6a(x)
+        x = self.inception.Mixed_6b(x)
+        x = self.inception.Mixed_6c(x)
+        x = self.inception.Mixed_6d(x)
+        x = self.inception.Mixed_6e(x)
+        f3 = x
+        x = self.inception.Mixed_7a(x)
+        x = self.inception.Mixed_7b(x)
+        x = self.inception.Mixed_7c(x)
+        f4 = x
         return [f1, f2, f3, f4]
