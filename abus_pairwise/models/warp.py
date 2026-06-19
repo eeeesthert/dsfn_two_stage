@@ -106,6 +106,7 @@ class WarpStage(nn.Module):
         grid_h: int = 9,
         grid_w: int = 9,
         local_refine_mode: str = "tps",
+        input_channels: int = 3,
     ):
         super().__init__()
         self.encoder = MultiScaleEncoder(name=encoder_name,
@@ -113,6 +114,7 @@ class WarpStage(nn.Module):
             checkpoint_path=encoder_ckpt,
             radimagenet_url=encoder_radimagenet_url,
             strict_load=encoder_strict_load,
+            in_channels=input_channels,
         )
         self.fca = FCA(c=self.encoder.out_channels[2])
         self.rr = RR(c=256)
@@ -233,11 +235,15 @@ class WarpStage(nn.Module):
         self,
         left: torch.Tensor,
         right: torch.Tensor,
+        left_context: torch.Tensor | None = None,
+        right_context: torch.Tensor | None = None,
         left_x: torch.Tensor | None = None,
         right_x: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
-        f_l = self.encoder(left)
-        f_r = self.encoder(right)
+        left_for_features = left if left_context is None else left_context
+        right_for_features = right if right_context is None else right_context
+        f_l = self.encoder(left_for_features)
+        f_r = self.encoder(right_for_features)
 
         # Stage-1: global homography (1/16 features, FCA + RR + DLT)
         corr_feat = self.fca(f_l[2], f_r[2])

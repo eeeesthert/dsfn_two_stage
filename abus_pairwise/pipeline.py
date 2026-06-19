@@ -31,6 +31,7 @@ class TwoStageStitcher(torch.nn.Module):
         encoder_name: str = "resnet50",
         apply_clahe_before_input: bool = False,
         apply_clahe_before_fusion: bool = False,
+        input_channels: int = 3,
     ):
         super().__init__()
         self.warp_net = WarpStage(
@@ -39,6 +40,7 @@ class TwoStageStitcher(torch.nn.Module):
             encoder_radimagenet_url=encoder_radimagenet_url,
             encoder_strict_load=encoder_strict_load,
             encoder_name=encoder_name,
+            input_channels=input_channels,
         )
         self.fusion_net = SoftSeamFusionUNet()
         self.apply_clahe_before_input = apply_clahe_before_input
@@ -56,13 +58,26 @@ class TwoStageStitcher(torch.nn.Module):
         self,
         left: torch.Tensor,
         right: torch.Tensor,
+        left_context: torch.Tensor | None = None,
+        right_context: torch.Tensor | None = None,
         left_x: torch.Tensor | None = None,
         right_x: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         if self.apply_clahe_before_input:
             left = self._clahe_tensor(left)
             right = self._clahe_tensor(right)
-        warp_out = self.warp_net(left, right, left_x=left_x, right_x=right_x)
+            if left_context is not None:
+                left_context = self._clahe_tensor(left_context)
+            if right_context is not None:
+                right_context = self._clahe_tensor(right_context)
+        warp_out = self.warp_net(
+            left,
+            right,
+            left_context=left_context,
+            right_context=right_context,
+            left_x=left_x,
+            right_x=right_x,
+        )
         left_fus = warp_out["left_warp"]
         right_fus = warp_out["right_warp"]
         if self.apply_clahe_before_fusion:

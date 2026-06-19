@@ -37,11 +37,35 @@ def _strip_prefixes(sd: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
     return out
 
 
+def _adapt_first_conv(conv: nn.Conv2d, in_channels: int) -> nn.Conv2d:
+    if in_channels == conv.in_channels:
+        return conv
+    new_conv = nn.Conv2d(
+        in_channels,
+        conv.out_channels,
+        kernel_size=conv.kernel_size,
+        stride=conv.stride,
+        padding=conv.padding,
+        dilation=conv.dilation,
+        groups=conv.groups,
+        bias=conv.bias is not None,
+        padding_mode=conv.padding_mode,
+    )
+    with torch.no_grad():
+        base_weight = conv.weight.mean(dim=1, keepdim=True)
+        new_conv.weight.copy_(base_weight.repeat(1, in_channels, 1, 1))
+        if conv.bias is not None and new_conv.bias is not None:
+            new_conv.bias.copy_(conv.bias)
+    return new_conv
+
+
 class MultiScaleEncoder(nn.Module):
-    def __init__(self, name: str = "resnet50", pretrain_source: str = "imagenet", checkpoint_path: str | None = None, radimagenet_url: str | None = None, strict_load: bool = False):
+    def __init__(self, name: str = "resnet50", pretrain_source: str = "imagenet", checkpoint_path: str | None = None, radimagenet_url: str | None = None, strict_load: bool = False, in_channels: int = 3):
         super().__init__()
         self.name = name.lower()
         source = pretrain_source.lower()
+        if in_channels <= 0:
+            raise ValueError("in_channels must be > 0")
         if self.name not in {"resnet50", "densenet121", "inceptionv3"}:
             raise ValueError(f"Unsupported encoder: {name}")
         if source not in {"imagenet", "radimagenet", "local", "none"}:
@@ -55,6 +79,7 @@ class MultiScaleEncoder(nn.Module):
                     sd = _strip_prefixes(_extract_state_dict(ckpt))
                     sd = {k: v for k, v in sd.items() if not k.startswith("fc.")}
                     base.load_state_dict(sd, strict=strict_load)
+            base.conv1 = _adapt_first_conv(base.conv1, in_channels)
             self.stem = nn.Sequential(base.conv1, base.bn1, base.relu, base.maxpool)
             self.layer1, self.layer2, self.layer3, self.layer4 = base.layer1, base.layer2, base.layer3, base.layer4
             self.out_channels = [256, 512, 1024, 2048]
@@ -65,6 +90,7 @@ class MultiScaleEncoder(nn.Module):
                 if ckpt is not None:
                     sd = _strip_prefixes(_extract_state_dict(ckpt))
                     base.load_state_dict(sd, strict=strict_load)
+            base.features.conv0 = _adapt_first_conv(base.features.conv0, in_channels)
             self.features = base.features
             self.out_channels = [256, 512, 1024, 1024]
         else:
@@ -75,6 +101,7 @@ class MultiScaleEncoder(nn.Module):
                     sd = _strip_prefixes(_extract_state_dict(ckpt))
                     sd = {k: v for k, v in sd.items() if not k.startswith("fc.") and not k.startswith("AuxLogits.")}
                     base.load_state_dict(sd, strict=strict_load)
+            base.Conv2d_1a_3x3.conv = _adapt_first_conv(base.Conv2d_1a_3x3.conv, in_channels)
             self.inception = base
             self.out_channels = [192, 288, 768, 2048]
 
