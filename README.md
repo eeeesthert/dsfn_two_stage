@@ -139,3 +139,26 @@ python fuse_three_view.py --pairwise-root ./outputs/results --out-dir ./outputs/
 
 - 目前先完成你要求的 **二维两两拼接**。
 - 已提供基于 step1/step2 的 input2 mask 的三视图高斯金字塔融合脚本（见上节）。
+
+## DeepHomography 对比实验（ABUS 输入适配）
+
+本仓库保留了原始对比方法代码：`contract/deephomography/Oneline-DLTv1`。为了直接使用当前 ABUS 数据格式，新增了 `train_deephomography_abus.py` 适配脚本，无需生成 DeepHomography 原仓库的 `Data/Train_List.txt`。
+
+按你的要求，默认不 resize、不 crop：脚本会读取每张 ABUS 切片的原始尺寸，并把整张原图作为 DeepHomography patch。因为不同切片原始尺寸可能不同，默认 `--batch-size 1`，适合在 RTX 4090 24GB 上直接跑原始大小输入：
+
+```bash
+python train_deephomography_abus.py \
+  --dataset-root ./dataset \
+  --out-dir ./outputs/deephomography_abus \
+  --stages 12 23 \
+  --batch-size 1 \
+  --workers 8 \
+  --amp
+```
+
+说明：
+- `--img-w 0 --img-h 0` 是默认设置，表示保留输入原始宽高，不做 resize。
+- `--patch-size-w 0 --patch-size-h 0` 是默认设置，表示使用整张图，不做 crop。
+- `--stages 12 23` 分别训练 `input1-input2` 和 `input2-input3` 两个对比模型。
+- 输出 checkpoint 保存到 `outputs/deephomography_abus/stage12/last.pt` 和 `outputs/deephomography_abus/stage23/last.pt`。
+- 如果确认所有训练样本原始尺寸完全一致，可以在 4090 24GB 上尝试增大 `--batch-size`；否则保持默认 `1`，避免 PyTorch 在拼 batch 时因为尺寸不同而报错。
