@@ -271,12 +271,16 @@ class ResNet(nn.Module):
         x = x.view(x.size(0), -1)
         x = self.fc(x)
         
-        H_mat = DLT_solve(h4p, x).squeeze(1)
+        # DLT/transformer math is numerically sensitive on full-resolution
+        # coordinates; keep it in fp32 even when the caller enables AMP.
+        H_mat = DLT_solve(h4p.float(), x.float()).squeeze(1)
 
         pred_I2 = transform(patch_size_h, patch_size_w, M_tile_inv, H_mat, M_tile,
-                            org_imges[:, :1, ...], patch_indices, batch_indices_tensor)
+                            org_imges[:, :1, ...].float(), patch_indices, batch_indices_tensor)
+        pred_I2 = torch.nan_to_num(pred_I2, nan=0.0, posinf=1.0, neginf=0.0)
         pred_Mask = transform(patch_size_h, patch_size_w, M_tile_inv, H_mat, M_tile,
-                            mask_I1_full, patch_indices, batch_indices_tensor)
+                            mask_I1_full.float(), patch_indices, batch_indices_tensor)
+        pred_Mask = torch.nan_to_num(pred_Mask, nan=0.0, posinf=1.0, neginf=0.0)
 
         pred_Mask = normMask(pred_Mask)
  
@@ -294,10 +298,14 @@ class ResNet(nn.Module):
 
         sum_value = torch.sum(mask_ap).clamp_min(1e-6)
         pred_I2_CnnFeature = self.ShareFeature(pred_I2)
+        pred_I2_CnnFeature = torch.nan_to_num(pred_I2_CnnFeature, nan=0.0, posinf=1.0, neginf=0.0)
  
         triplet_loss_mat = pixelwise_triplet_margin_loss(patch_2, pred_I2_CnnFeature, patch_1)
+        triplet_loss_mat = torch.nan_to_num(triplet_loss_mat, nan=0.0, posinf=1e6, neginf=0.0)
         feature_align_loss_mat = torch.abs(patch_2 - pred_I2_CnnFeature).sum(dim=1, keepdim=True)
-        photometric_loss_mat = torch.abs(input_tesnors[:, 1:, ...] - pred_I2)
+        feature_align_loss_mat = torch.nan_to_num(feature_align_loss_mat, nan=0.0, posinf=1e6, neginf=0.0)
+        photometric_loss_mat = torch.abs(input_tesnors[:, 1:, ...].float() - pred_I2.float())
+        photometric_loss_mat = torch.nan_to_num(photometric_loss_mat, nan=0.0, posinf=1e6, neginf=0.0)
         feature_loss_mat = triplet_loss_mat + 0.1 * feature_align_loss_mat + photometric_loss_mat
         feature_loss_mat = torch.nan_to_num(feature_loss_mat, nan=0.0, posinf=1e6, neginf=0.0)
 
