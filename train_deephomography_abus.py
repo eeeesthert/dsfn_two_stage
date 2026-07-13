@@ -198,7 +198,16 @@ def train_one_stage(args: argparse.Namespace, stage: str, device: torch.device) 
             losses.append(float(loss.detach().cpu()))
             global_step += 1
             if args.log_every > 0 and global_step % args.log_every == 0:
-                print(f"stage={stage} epoch={epoch + 1}/{args.epochs} step={global_step} loss={np.mean(losses[-args.log_every:]):.6f}")
+                mask_mean = float(out.get("mask_ap_mean", torch.tensor(float("nan"))).detach().cpu())
+                unmasked_loss = float(out.get("feature_loss_unmasked", torch.tensor(float("nan"))).detach().cpu())
+                triplet_loss = float(out.get("triplet_loss_unmasked", torch.tensor(float("nan"))).detach().cpu())
+                photometric_loss = float(out.get("photometric_loss_unmasked", torch.tensor(float("nan"))).detach().cpu())
+                print(
+                    f"stage={stage} epoch={epoch + 1}/{args.epochs} step={global_step} "
+                    f"loss={np.mean(losses[-args.log_every:]):.6f} "
+                    f"unmasked_loss={unmasked_loss:.6f} triplet={triplet_loss:.6f} "
+                    f"photo={photometric_loss:.6f} mask_mean={mask_mean:.6f}"
+                )
         torch.save({"model": net.state_dict(), "args": vars(args), "stage": stage, "epoch": epoch + 1}, out_dir / "last.pt")
         print(f"stage={stage} epoch={epoch + 1} mean_loss={np.mean(losses):.6f}")
     return out_dir / "last.pt"

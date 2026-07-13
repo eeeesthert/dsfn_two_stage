@@ -281,6 +281,10 @@ class ResNet(nn.Module):
         pred_Mask = normMask(pred_Mask)
  
         mask_ap = torch.nan_to_num(torch.mul(mask_I2, pred_Mask), nan=0.0, posinf=1.0, neginf=0.0)
+        # Do not allow a degenerate learned mask to silence the whole loss.
+        # Full-image ABUS training starts from random mask generators; if their
+        # overlap is all zero, clamping only the denominator would make loss=0.
+        mask_ap = torch.clamp(mask_ap, min=1e-3, max=1.0)
 
         # step1 freeze the mask_ap use "mask_ap = torch.ones_like(mask_ap)" ,thus gradient do not update and mask=1
         # step2 delete this line ("mask_ap = torch.ones_like(mask_ap)")  to update gradient of genMask
@@ -291,11 +295,18 @@ class ResNet(nn.Module):
         sum_value = torch.sum(mask_ap).clamp_min(1e-6)
         pred_I2_CnnFeature = self.ShareFeature(pred_I2)
  
-        feature_loss_mat = pixelwise_triplet_margin_loss(patch_2, pred_I2_CnnFeature, patch_1)
+        triplet_loss_mat = pixelwise_triplet_margin_loss(patch_2, pred_I2_CnnFeature, patch_1)
+        feature_align_loss_mat = torch.abs(patch_2 - pred_I2_CnnFeature).sum(dim=1, keepdim=True)
+        photometric_loss_mat = torch.abs(input_tesnors[:, 1:, ...] - pred_I2)
+        feature_loss_mat = triplet_loss_mat + 0.1 * feature_align_loss_mat + photometric_loss_mat
         feature_loss_mat = torch.nan_to_num(feature_loss_mat, nan=0.0, posinf=1e6, neginf=0.0)
 
+        feature_loss_unmasked = torch.mean(feature_loss_mat)
+        triplet_loss_unmasked = torch.mean(triplet_loss_mat.detach())
+        photometric_loss_unmasked = torch.mean(photometric_loss_mat.detach())
         feature_loss = torch.sum(torch.mul(feature_loss_mat, mask_ap)) / sum_value
         feature_loss = torch.unsqueeze(feature_loss, 0)
+        mask_ap_mean = torch.mean(mask_ap.detach())
 
         pred_I2_d = pred_I2[:1, ...]
         patch_2_res_d = patch_2_res[:1, ...]
@@ -304,8 +315,12 @@ class ResNet(nn.Module):
         feature_loss_mat_d = feature_loss_mat[:1, ...]
 
         out_dict = {}
-        out_dict.update(feature_loss=feature_loss, pred_I2_d=pred_I2_d, x=x, H_mat=H_mat, patch_2_res_d=patch_2_res_d,
-                        pred_I2_CnnFeature_d=pred_I2_CnnFeature_d, mask_ap_d=mask_ap_d.squeeze(1), feature_loss_mat_d=feature_loss_mat_d)
+        out_dict.update(feature_loss=feature_loss, feature_loss_unmasked=feature_loss_unmasked.detach(),
+                        triplet_loss_unmasked=triplet_loss_unmasked,
+                        photometric_loss_unmasked=photometric_loss_unmasked,
+                        mask_ap_mean=mask_ap_mean, pred_I2_d=pred_I2_d, x=x, H_mat=H_mat,
+                        patch_2_res_d=patch_2_res_d, pred_I2_CnnFeature_d=pred_I2_CnnFeature_d,
+                        mask_ap_d=mask_ap_d.squeeze(1), feature_loss_mat_d=feature_loss_mat_d)
         
         return out_dict
 
