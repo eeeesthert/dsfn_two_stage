@@ -365,7 +365,7 @@ def build_output_model(net, input1_tensor, input2_tensor):
 # define and forward
 class Network(nn.Module):
 
-    def __init__(self):
+    def __init__(self, pretrained=True):
         super(Network, self).__init__()
 
         self.regressNet1_part1 = nn.Sequential(
@@ -445,7 +445,7 @@ class Network(nn.Module):
                 m.bias.data.zero_()
 
         ssl._create_default_https_context = ssl._create_unverified_context
-        resnet50_model = models.resnet.resnet50(pretrained=True)
+        resnet50_model = models.resnet.resnet50(pretrained=pretrained)
 
         if torch.cuda.is_available():
             resnet50_model = resnet50_model.cuda()
@@ -483,7 +483,8 @@ class Network(nn.Module):
         ######### stage 1
         correlation_32 = self.CCL(feature_1_32, feature_2_32)
         temp_1 = self.regressNet1_part1(correlation_32)
-        temp_1 = temp_1.view(temp_1.size()[0], -1)
+        temp_1 = F.adaptive_avg_pool2d(temp_1, (4, 4))
+        temp_1 = temp_1.reshape(temp_1.size()[0], -1)
         offset_1 = self.regressNet1_part2(temp_1)
         H_motion_1 = offset_1.reshape(-1, 4, 2)
 
@@ -512,7 +513,8 @@ class Network(nn.Module):
         ######### stage 2
         correlation_64 = self.CCL(feature_1_64, warp_feature_2_64)
         temp_2 = self.regressNet2_part1(correlation_64)
-        temp_2 = temp_2.view(temp_2.size()[0], -1)
+        temp_2 = F.adaptive_avg_pool2d(temp_2, (4, 4))
+        temp_2 = temp_2.reshape(temp_2.size()[0], -1)
         offset_2 = self.regressNet2_part2(temp_2)
 
 

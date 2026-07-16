@@ -81,10 +81,14 @@ def inter_grid_loss(overlap, mesh):
 
 
 # intra-grid constraint
-def intra_grid_loss(pts):
+def intra_grid_loss(pts, img_h=None, img_w=None):
 
-    max_w = 512/grid_w * 2
-    max_h = 512/grid_h * 2
+    if img_w is None:
+        img_w = 512
+    if img_h is None:
+        img_h = 512
+    max_w = float(img_w)/grid_w * 2
+    max_h = float(img_h)/grid_h * 2
 
     delta_x = pts[:,:,1:grid_w+1,0] - pts[:,:,0:grid_w,0]
     delta_y = pts[:,1:grid_h+1,:,1] - pts[:,0:grid_h,:,1]
