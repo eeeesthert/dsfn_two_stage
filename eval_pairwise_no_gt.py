@@ -21,7 +21,6 @@ def _resize_to_common(a: np.ndarray, b: np.ndarray) -> Tuple[np.ndarray, np.ndar
     w = min(a.shape[1], b.shape[1])
     return a[:h, :w], b[:h, :w]
 
-
 def _masked_mse(a: np.ndarray, b: np.ndarray, mask: np.ndarray) -> float:
     d = (a.astype(np.float64) - b.astype(np.float64)) ** 2
     return float(np.mean(d[mask]))
