@@ -36,6 +36,48 @@ Original pairs: `ROOT/{train,test}/case_x/reference.png,target.png`, or pass a t
 
 Inference computes the union of reference corners and H-transformed target corners, applies a positive-canvas translation, warps both images/masks, then fuses. Union-canvas handling is a necessary engineering implementation detail not specified by the paper. Debug warps, masks, seams and result are saved beside the output.
 
+## ABUS comparison experiment
+
+The adapter accepts both a single image per view and a directory of matched slices. A nipple annotation is **not** required by this baseline:
+
+```text
+dataset/case001/input1/slice_0001.jpg
+dataset/case001/input2/slice_0001.jpg
+dataset/case001/input3/slice_0001.jpg
+```
+
+Train the paper's two phases separately. Both pair directions share one alignment model and one fusion model, so the comparison uses the same 1-2/2-3 protocol as the main ABUS experiment:
+
+```bash
+cd DunHuangStitch
+
+# Phase 1: unsupervised alignment over input1-input2 and input2-input3.
+python train_alignment_abus.py \
+  --dataset-root ../dataset \
+  --output checkpoints/abus_alignment \
+  --image-size 0 --batch-size 1
+
+# Freeze alignment and materialize union-canvas pairs for phase 2.
+python generate_aligned_abus.py \
+  --dataset-root ../dataset \
+  --checkpoint checkpoints/abus_alignment/best.pt \
+  --output-root aligned_abus --image-size 0
+
+# Phase 2: seam/fusion training.
+python train_fusion_abus.py \
+  --aligned-root aligned_abus \
+  --output checkpoints/abus_fusion --batch-size 1
+
+# Dataset-wide comparison inference.
+python inference_abus.py \
+  --dataset-root ../dataset \
+  --alignment-checkpoint checkpoints/abus_alignment/best.pt \
+  --fusion-checkpoint checkpoints/abus_fusion/best.pt \
+  --output-root ../outputs/dunhuangstitch_abus --image-size 0
+```
+
+`--image-size 0` preserves the native slice resolution and therefore defaults to batch size 1; set a positive square size if batching differently sized cases. Results use `12/<case>/fusion/12_<slice>_stitched.png` and the analogous `23` path, plus warped images, masks, and `.npz` transforms. This naming is compatible with the repository's pairwise comparison/evaluation layout.
+
 ## Evaluation and visualization
 `metrics/alignment_metrics.py` supplies RMSE, PSNR, and SSIM; synthetic offsets permit four-point RMSE. `metrics/seam_quality.py` supplies lower-is-better `Q_seam = 1000 E_patch + E_point`, using seam dilation radius 5. Debug writers save every alignment stage and fusion seam. `evaluate.py` exposes the metric API for dataset-specific evaluation.
 
