@@ -162,3 +162,7 @@ python train_deephomography_abus.py \
 - `--stages 12 23` 分别训练 `input1-input2` 和 `input2-input3` 两个对比模型。
 - 输出 checkpoint 保存到 `outputs/deephomography_abus/stage12/last.pt` 和 `outputs/deephomography_abus/stage23/last.pt`。
 - 如果确认所有训练样本原始尺寸完全一致，可以在 4090 24GB 上尝试增大 `--batch-size`；否则保持默认 `1`，避免 PyTorch 在拼 batch 时因为尺寸不同而报错。
+
+## DunHuangStitch 对比实验（ABUS 输入适配）
+
+`DunHuangStitch/` 现已提供完整 ABUS 工作流：`train_alignment_abus.py` 在 12/23 图像对上训练共享配准网络，`generate_aligned_abus.py` 冻结配准并生成融合训练集，`train_fusion_abus.py` 训练融合网络，最后由 `inference_abus.py` 批量输出两阶段结果。适配器支持单图和 `inputN/slice_xxxx` 两种目录结构，不依赖 `nipple_x.txt`，并默认以 `--image-size 0 --batch-size 1` 保留 ABUS 原始分辨率。完整命令见 [`DunHuangStitch/README.md`](DunHuangStitch/README.md#abus-comparison-experiment)。
