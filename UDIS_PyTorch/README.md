@@ -47,7 +47,7 @@ Adam starts at `1e-4`, decay is `0.98` per 10,000 steps, batch is one, and defau
 
 ## Data
 
-Stage-1 CSV may have header `image1,image2`, followed by paths. Synthetic pretraining accepts a directory of single images and returns random four-corner perturbations; known offsets are exposed only as debug metadata and training remains photometric.
+Stage-1 CSV may have header `image1,image2`, followed by paths. Synthetic pretraining accepts a directory of single images and returns random four-corner perturbations; known offsets are exposed only as debug metadata and training remains photometric. The dataset implementations are grouped in `datasets/datasets.py` by their shared data-loading responsibility rather than split into one-class modules.
 
 Aligned data layout is `aligned_dataset/{training,testing}/{warp1,warp2,mask1,mask2}/same_name.png`. Images are RGB `float32` in `[-1,1]`; masks are `[0,1]`. Stage 2 proportionally limits dimensions to 1024 and aligns them to multiples of eight.
 
@@ -62,6 +62,32 @@ python infer.py --image1 a.jpg --image2 b.jpg --alignment_ckpt checkpoints/align
 pytest -q
 python tools/inspect_model.py
 ```
+
+### ABUS input and pairwise evaluation
+
+Batch inference directly accepts the three-view slice layout without resizing or changing the original UDIS network:
+
+```text
+dataset/case001/input1/slice_0001.jpg
+dataset/case001/input2/slice_0001.jpg
+dataset/case001/input3/slice_0001.jpg
+dataset/case001/nipple_x.txt
+```
+
+Slices are matched by filename. The nipple coordinates are parsed and retained as dataset metadata, but are deliberately not injected into UDIS because that would alter the original method. Run both 1-2 and 2-3 stages with:
+
+```bash
+python UDIS_PyTorch/infer_abus.py \
+  --dataset-root ./dataset \
+  --alignment-ckpt UDIS_PyTorch/checkpoints/alignment_latest.pth \
+  --reconstruction-ckpt UDIS_PyTorch/checkpoints/reconstruction_latest.pth \
+  --out-dir ./udis_outputs/results
+python eval_pairwise_no_gt.py \
+  --pairwise-root ./udis_outputs/results \
+  --out-csv ./udis_outputs/no_gt_eval_all.csv
+```
+
+The output hierarchy and names (`12|23/case*/fusion/{stage}_{slice}_stitched.png` plus left/right soft masks) are directly compatible with `eval_pairwise_no_gt.py`.
 
 Both training scripts accept `--resume`. Checkpoints contain model, optimizer, scheduler, global step, and configuration.
 
