@@ -46,3 +46,16 @@ Every run creates `01_preprocessed` through `10_fusion`, `final_stitched.png`, `
 ## Known differences from original implementation
 
 The publication does not provide enough information to reproduce several choices exactly. In particular its saliency detector, feature correspondence details, Gabor energy reduction, sparse least-squares parameterization/Jacobian, and fusion weight equation are unavailable. Configurable and explicitly marked reproduction assumptions are used rather than invented paper claims. See [reproduction notes](docs/reproduction_notes.md), [algorithm](docs/algorithm.md), and [equations](docs/equations.md).
+
+## Source organization
+
+The implementation is intentionally grouped by responsibility instead of splitting every small operation into a separate module:
+
+* `src/image.py` contains image I/O, normalization, grayscale conversion, and preprocessing.
+* `src/features.py` contains SIFT, SLIC region extraction, feature merging, and matching.
+* `src/registration.py` contains normalized DLT, RANSAC, canvas construction, and warping.
+* `src/constraints.py` contains Gabor, saliency, transform validation, and refinement.
+* `src/output.py` contains blending, metrics, and visualization.
+* `src/pipeline.py` only orchestrates the complete workflow and its outputs.
+
+Python blocks use tab indentation throughout this package. Statements are kept on separate lines rather than joined with semicolons.
