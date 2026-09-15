@@ -18,3 +18,7 @@ The paper does not disclose SLIC `K`; SIFT implementation settings; descriptor r
 * Spectral residual saliency, percentile/NMS points, initial-H nearest-neighbor correspondence, and global Eq. (10) spread are assumptions. Gradient, local variance, and (when available) fine-grained backends are alternatives.
 * Because the paper omits optimization variables and Jacobian, nonlinear local eight-parameter homography least squares is the stable default; a finite-difference linearization with SciPy sparse `lsqr` is also implemented. This is not represented as author-official code.
 * Distance-transform linear weights are the default approximation to linear smoothing; intensity weighting is optional. Regional metrics beyond paper PSNR/SSIM are engineering extensions.
+
+## ABUS-derived dataset adapter
+
+The dataset adapter treats `input2` as the target for both generated jobs. Pair `12` uses `input1` as reference and pair `23` uses `input3` as reference. Matching is by identical slice filename. `nipple_x.txt` is retained in `jobs.json` and `batch_status.json` as case metadata. The paper does not define a nipple-coordinate term in the two-image objective, so the adapter does not inject this value into registration or blending.

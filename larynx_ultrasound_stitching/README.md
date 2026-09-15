@@ -32,12 +32,29 @@ Use `--config configs/debug.yaml`, `--slic-k 50|100|150|200|300|400|500`, or one
 
 ## Batch inference and evaluation
 
+The ABUS-derived two-dimensional dataset runner accepts this layout:
+
+```text
+dataset/case001/input1/slice_0001.jpg
+dataset/case001/input2/slice_0001.jpg
+dataset/case001/input3/slice_0001.jpg
+dataset/case001/nipple_x.txt
+```
+
+For every common slice filename, pair `12` uses `input1` as reference and `input2` as target. Pair `23` uses `input3` as reference and the same `input2` image as target. Discover the jobs without running image processing first:
+
 ```bash
-python scripts/run_dataset.py --manifest pairs.csv --output outputs/batch
+python scripts/run_dataset.py --dataset-root ./dataset --output outputs/abus --dry-run
+```
+
+Run all discovered pairs with:
+
+```bash
+python scripts/run_dataset.py --dataset-root ./dataset --output outputs/abus --mode full
 python scripts/evaluate.py aligned_reference.png aligned_target.png
 ```
 
-The manifest has `case,reference,target` columns. A failed case produces a status record and does not terminate the batch. Metrics include paper MSE/PSNR/SSIM plus clearly identified engineering-extension NCC and full/overlap/union/seam-band regions.
+The runner writes `jobs.json` before processing and `batch_status.json` afterwards. `nipple_x.txt` is recorded in each job as case metadata but is not used to alter the paper's registration objective. A failed slice does not terminate the remaining jobs. Metrics include paper MSE/PSNR/SSIM plus clearly identified engineering-extension NCC and full/overlap/union/seam-band regions.
 
 ## Intermediate results
 
