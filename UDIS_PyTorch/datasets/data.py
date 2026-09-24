@@ -94,12 +94,16 @@ class AlignmentDataset(Dataset):
 		color: tuple[float, float] = (0.7, 1.3),
 		augment: bool = True,
 		abus_root: str | Path | None = None,
-		stage: str = "12",
+		stages: tuple[str, ...] = ("12", "23"),
 	) -> None:
 		if (manifest is None) == (abus_root is None):
 			raise ValueError("provide exactly one of manifest or abus_root")
 		if abus_root is not None:
-			self.pairs = scan_abus_pairs(abus_root, stage)
+			self.pairs = [
+				pair
+				for stage in stages
+				for pair in scan_abus_pairs(abus_root, stage)
+			]
 		else:
 			self.pairs = self._read_manifest(Path(manifest))
 		if not self.pairs:

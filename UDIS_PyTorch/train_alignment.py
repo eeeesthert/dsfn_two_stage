@@ -22,7 +22,13 @@ def main() -> None:
 	p.add_argument("--config", default="configs/alignment.yaml")
 	p.add_argument("--resume")
 	p.add_argument("--dataset-root", type=Path)
-	p.add_argument("--stage", choices=("12", "23"), default="12")
+	p.add_argument(
+		"--stages",
+		nargs="+",
+		choices=("12", "23"),
+		default=("12", "23"),
+		help="ABUS pairs used for training. By default both share one alignment model.",
+	)
 	p.add_argument(
 		"--batch-size",
 		type=int,
@@ -46,7 +52,7 @@ def main() -> None:
 		"color": (cfg["color_min"], cfg["color_max"]),
 	}
 	if a.dataset_root:
-		dataset_options.update(abus_root=a.dataset_root, stage=a.stage)
+		dataset_options.update(abus_root=a.dataset_root, stages=tuple(a.stages))
 	else:
 		dataset_options["manifest"] = cfg["manifest"]
 	ds = AlignmentDataset(**dataset_options)

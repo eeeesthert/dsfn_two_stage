@@ -101,8 +101,57 @@ Train Stage 1 directly from ABUS input:
 python UDIS_PyTorch/train_alignment.py \
     --config UDIS_PyTorch/configs/alignment.yaml \
     --dataset-root ./dataset \
-    --stage 12
+    --stages 12 23
 ```
+
+### Complete ABUS training order without CSV
+
+You do **not** need to create a CSV for the repository's native ABUS layout,
+and you do not need to edit either YAML file when using the default paths.
+Run commands from the repository root in this order:
+
+1. Train the shared Stage-1 alignment model directly from both ABUS pair types.
+
+   ```bash
+   python UDIS_PyTorch/train_alignment.py \
+       --config UDIS_PyTorch/configs/alignment.yaml \
+       --dataset-root ./dataset \
+       --stages 12 23
+   ```
+
+2. Use the trained alignment checkpoint to generate the frozen Stage-2 dataset.
+
+   ```bash
+   python UDIS_PyTorch/generate_aligned_dataset.py \
+       --checkpoint checkpoints/alignment_latest.pth \
+       --dataset-root ./dataset \
+       --stages 12 23 \
+       --output aligned_dataset \
+       --split training
+   ```
+
+3. Train Stage 2. In the paper and this project it is called
+   **reconstruction**, not registration. The default reconstruction config
+   already reads `aligned_dataset/training`.
+
+   ```bash
+   python UDIS_PyTorch/train_reconstruction.py \
+       --config UDIS_PyTorch/configs/reconstruction.yaml
+   ```
+
+4. Run inference after both checkpoints exist.
+
+   ```bash
+   python UDIS_PyTorch/infer_abus.py \
+       --dataset-root ./dataset \
+       --alignment-ckpt checkpoints/alignment_latest.pth \
+       --reconstruction-ckpt checkpoints/reconstruction_latest.pth \
+       --out-dir outputs/udis_abus \
+       --stages 12 23
+   ```
+
+The CSV path remains available only for non-ABUS datasets. Use either
+`--input pairs.csv` or `--dataset-root ./dataset`, never both.
 
 Run both pairwise stages and write files compatible with the repository's
 `stage/case/fusion` convention:
