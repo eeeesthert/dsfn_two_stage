@@ -25,6 +25,30 @@ python test.py --data-root=/path/to/your/dataset --out-dir=/path/to/save/outputs
 
 The model checkpoint is provided in `checkpoints/ckpt.pth`.
 
+## ABUS 2-D pairwise zero-shot inference
+
+The additive adapter in `pixelstitch_abus/` leaves the official RAFTStitch and
+UDIS-D inference paths unchanged. It reads `case*/input1|input2|input3/slice_*.jpg`,
+keeps the stage directions `12=(input1,input2)` and `23=(input2,input3)`, and uses
+the real slice identifier in every output filename. No 3-D or DSFN component is
+used.
+
+```shell
+python infer_abus_pairwise.py \
+  --dataset-root /path/to/dataset \
+  --checkpoint ./checkpoints/ckpt.pth \
+  --homography-root /path/to/homography_root \
+  --homography-source precomputed \
+  --out-dir ./outputs/pixelstitch \
+  --stages 12 23 --image-size 0 --device cuda
+```
+
+Precomputed corner-motion arrays are read from
+`<homography_root>/<stage>/<case>/<slice_id>.npy`. `udis2` is an explicit alias
+for precomputed UDIS++ arrays; `matrix` accepts 3-by-3 matrices. Failed coarse
+homographies fall back to nipple-x horizontal translation and then identity.
+For a one-slice diagnostic run, add `--case case001 --slice-id 0053`.
+
 # Acknowledgements
 
 This project is developed upon the following works:
