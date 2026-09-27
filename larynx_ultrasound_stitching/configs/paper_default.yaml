@@ -1,0 +1,63 @@
+# Independent reproduction configuration. Unpublished values are marked below.
+preprocessing:
+  clahe: false # reproduction assumption
+  clahe_clip_limit: 2.0 # reproduction assumption
+  clahe_grid_size: 8 # reproduction assumption
+  gaussian_sigma: 0 # reproduction assumption
+sift:
+  nfeatures: 0 # reproduction assumption
+  contrast_threshold: 0.04 # reproduction assumption
+  edge_threshold: 10 # reproduction assumption
+  sigma: 1.6 # reproduction assumption
+  min_keypoints: 4 # reproduction assumption
+slic:
+  n_segments: 200 # reproduction assumption: paper does not report K
+  compactness: 10 # specified by paper (m)
+  sigma: 0 # reproduction assumption
+  enforce_connectivity: true # reproduction assumption
+features:
+  duplicate_radius: 2.0 # reproduction assumption
+  descriptor_cosine_threshold: 0.95 # reproduction assumption
+matching:
+  ratio_test: 0.75 # reproduction assumption
+  mutual_check: false # reproduction assumption
+ransac:
+  reprojection_threshold: 3.0 # reproduction assumption
+  confidence: 0.995 # reproduction assumption
+  max_iterations: 5000 # reproduction assumption
+  min_inliers: 8 # reproduction assumption
+  seed: 42 # reproduction assumption
+gabor:
+  scales: 5 # specified by paper
+  orientations: 6 # specified by paper
+  sigma: 2.0 # reproduction assumption
+  energy_window: 9 # reproduction assumption
+  downsample_factor: 4 # reproduction assumption
+  kernel_size: 31 # reproduction assumption
+  backend: paper
+saliency:
+  method: spectral_residual # reproduction assumption
+  percentile: 90 # reproduction assumption
+  max_points: 500 # reproduction assumption
+  min_distance: 5 # reproduction assumption
+  match_distance: 15 # reproduction assumption
+  variance_mode: global # reproduction assumption
+refinement:
+  backend: nonlinear
+  lambda_g: 1.0 # paper specifies Eg + Es
+  lambda_s: 1.0 # paper specifies Eg + Es
+  normalize_residuals: true # reproduction assumption
+  max_nfev: 100 # reproduction assumption
+  ftol: 1.0e-8 # reproduction assumption
+  xtol: 1.0e-8 # reproduction assumption
+  gtol: 1.0e-8 # reproduction assumption
+transform_check:
+  min_area_ratio: 0.25 # reproduction assumption
+  max_area_ratio: 4.0 # reproduction assumption
+  max_canvas_pixels: 100000000 # reproduction assumption
+  max_perspective: 0.01 # reproduction assumption
+blending:
+  method: linear_distance # reproduction assumption: exact paper weights unavailable
+output:
+  save_intermediate: true
+  save_visualization: true

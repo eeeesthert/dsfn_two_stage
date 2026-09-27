@@ -1,0 +1,13 @@
+seed: 42
+device: cuda
+amp: true
+data: {root: aligned_dataset, image_size: [128, 128]}
+model:
+  channels: [24, 32, 48, 64, 96] # engineering defaults; not reported in paper
+  difference_mode: signed
+  attention: {heads: 4, window_size: 8, mlp_ratio: 2.0}
+  activation: gelu
+  eps: 1.0e-6
+fusion_loss: {alpha_edge: 1.0, lf_mode: paper_literal, lambda_b: 1.0, lambda_o: 1.0, lambda_f: 1.0}
+training: {epochs: 50, batch_size: 4, optimizer: adamw, lr: 1.0e-4, weight_decay: 1.0e-4, betas: [0.9, 0.999], warmup_epochs: 5, scheduler: exponential, scheduler_gamma: 0.98, workers: 4}
+metrics: {seam_dilation_radius: 5, seam_gamma: 1000}
