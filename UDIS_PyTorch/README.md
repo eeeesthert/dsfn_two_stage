@@ -198,3 +198,54 @@ tensor shapes, gradients, ABUS pairing, and reconstruction output. The separate
 Stage-1 test files were therefore merged into `tests/test_alignment.py`. The
 disabled full-network smoke test was removed because it duplicated the model
 inspection script while being skipped in normal test runs.
+
+## Troubleshooting alignment divergence and canvas OOM
+
+An error requesting thousands or millions of GiB during aligned-data generation
+is not a normal memory requirement. It means the alignment model predicted a
+near-singular or extremely large homography. Transformed corners then reach huge
+coordinates, and an unchecked stitching transformer attempts to allocate that
+union canvas. The transformer now validates finite corners, per-axis expansion,
+and total pixels before constructing a sampling grid, so this failure produces a
+diagnostic error instead of a CUDA OOM.
+
+`generate_aligned_dataset.py` stops on an invalid prediction by default. Use
+`--skip-invalid` only to inspect how many samples fail. A large skipped fraction
+means the checkpoint must not be used to train reconstruction.
+
+Directly training the 188-million-parameter alignment regressor from random
+initialization on real ABUS pairs is not the paper's training schedule. ABUS has
+speckle, parallax, low overlap, and large appearance differences, so its
+photometric objective may plateau or rise. Follow the paper's schedule:
+
+1. pretrain alignment on synthetic no-parallax homography pairs
+2. fine-tune that checkpoint on real ABUS pairs with a lower learning rate
+3. generate aligned data only after visual warp checks and stable corner offsets
+
+For example, pretrain from a directory of ordinary RGB images:
+
+```bash
+python UDIS_PyTorch/train_alignment.py \
+    --config UDIS_PyTorch/configs/alignment.yaml \
+    --synthetic-root /path/to/pretraining/images \
+    --synthetic-perturbation 16
+```
+
+Then start a new ABUS fine-tuning run from model weights only. `--weights` is
+different from `--resume`: it resets the iteration and optimizer state.
+
+```bash
+python UDIS_PyTorch/train_alignment.py \
+    --config UDIS_PyTorch/configs/alignment.yaml \
+    --weights checkpoints/alignment_latest.pth \
+    --dataset-root ./dataset \
+    --stages 12 23 \
+    --learning-rate 0.00001
+```
+
+TensorBoard now records the three level losses, learning rate,
+`offset/mean_abs`, and `offset/max_abs`. A rapidly growing maximum offset is an
+early warning that the homography and future canvas will be invalid. The
+reported alignment total is a weighted `16:4:1` sum, so a value around 5 is not
+directly comparable to an unweighted pixel L1 value. Convergence should be
+judged together with each level, offsets, and saved warp visualizations.

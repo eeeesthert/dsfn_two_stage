@@ -72,3 +72,10 @@ def test_stitching_canvas_union(tx, ty):
 	assert width % 8 == 0
 	assert width >= 32 + abs(tx)
 	assert 0 <= output["mask1"].min() <= output["mask1"].max() <= 1
+
+
+def test_stitching_canvas_rejects_explosive_homography_before_allocation():
+	image = torch.ones(1, 3, 24, 32)
+	homography = torch.tensor([[[1.0, 0, 1e9], [0, 1.0, 0], [0, 0, 1.0]]])
+	with pytest.raises(RuntimeError, match="Unsafe stitching canvas"):
+		StitchingDomainTransformer()(image, image, homography)

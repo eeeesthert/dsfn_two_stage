@@ -289,9 +289,11 @@ class HomographyNet(nn.Module):
 class StitchingDomainTransformer(nn.Module):
 	"""Warp equal-sized pairs onto a complete union canvas (batch size one or common canvas)."""
 
-	def __init__(self, multiple=8):
+	def __init__(self, multiple=8, max_canvas_scale=4.0, max_canvas_pixels=64_000_000):
 		super().__init__()
 		self.multiple = multiple
+		self.max_canvas_scale = max_canvas_scale
+		self.max_canvas_pixels = max_canvas_pixels
 
 	def forward(self, image1, image2, H):
 		if image1.shape != image2.shape:
@@ -308,6 +310,11 @@ class StitchingDomainTransformer(nn.Module):
 			.expand(b, -1, -1)
 		)
 		moved = transform_points(H, corners)
+		if not torch.isfinite(moved).all():
+			raise RuntimeError(
+				"Unsafe stitching canvas: the predicted homography produced non-finite corners. "
+				"The alignment checkpoint is invalid or has not converged."
+			)
 		allp = torch.cat((corners, moved), 1)
 		xmin = torch.floor(allp[..., 0].amin(1))
 		ymin = torch.floor(allp[..., 1].amin(1))
@@ -318,13 +325,31 @@ class StitchingDomainTransformer(nn.Module):
 		y0 = ymin.min()
 		x1 = xmax.max()
 		y1 = ymax.max()
+		canvas_width = float(x1 - x0 + 1)
+		canvas_height = float(y1 - y0 + 1)
+		max_width = self.max_canvas_scale * w
+		max_height = self.max_canvas_scale * h
+		if (
+			canvas_width <= 0
+			or canvas_height <= 0
+			or canvas_width > max_width
+			or canvas_height > max_height
+			or canvas_width * canvas_height > self.max_canvas_pixels
+		):
+			raise RuntimeError(
+				"Unsafe stitching canvas: "
+				f"predicted {canvas_width:.1f}x{canvas_height:.1f} pixels for an input "
+				f"of {w}x{h}. The alignment checkpoint is invalid or has not converged. "
+				"Do not increase the canvas limit to hide this error. Inspect delta offsets and "
+				"pretrain alignment on synthetic homographies before ABUS fine-tuning."
+			)
 		cw = max(
 			self.multiple,
-			int(math.ceil(float(x1 - x0 + 1) / self.multiple)) * self.multiple,
+			int(math.ceil(canvas_width / self.multiple)) * self.multiple,
 		)
 		ch = max(
 			self.multiple,
-			int(math.ceil(float(y1 - y0 + 1) / self.multiple)) * self.multiple,
+			int(math.ceil(canvas_height / self.multiple)) * self.multiple,
 		)
 		origin = torch.stack((x0, y0)).unsqueeze(0).expand(b, -1)
 		eye = torch.eye(3, device=device, dtype=dtype).unsqueeze(0).expand(b, -1, -1)

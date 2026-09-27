@@ -26,6 +26,11 @@ def parse_args() -> argparse.Namespace:
 	parser.add_argument("--output", type=Path, required=True)
 	parser.add_argument("--split", default="training")
 	parser.add_argument("--cpu", action="store_true")
+	parser.add_argument(
+		"--skip-invalid",
+		action="store_true",
+		help="Skip pairs whose predicted homography would create an unsafe canvas.",
+	)
 	return parser.parse_args()
 
 
@@ -69,17 +74,26 @@ def main() -> None:
 	pairs = collect_pairs(args)
 	if not pairs:
 		raise ValueError("no input pairs were found")
+	skipped = []
 	for pair in pairs:
 		image1 = load_rgb(pair.image1)[None].to(device)
 		image2 = load_rgb(pair.image2)[None].to(device)
 		if image1.shape != image2.shape:
 			raise ValueError(f"paired image sizes differ: {pair.image1}, {pair.image2}")
-		with torch.no_grad():
-			output = pipeline(image1, image2)
+		try:
+			with torch.inference_mode():
+				output = pipeline(image1, image2)
+		except RuntimeError as error:
+			if not args.skip_invalid or "Unsafe stitching canvas" not in str(error):
+				raise
+			skipped.append((pair, str(error)))
+			print(f"skipped {pair.stage}/{pair.case}/{pair.slice_id}: {error}")
+			continue
 		name = output_name(pair)
 		for key in ("warp1", "warp2", "mask1", "mask2"):
 			save_image(output[key][0], output_root / key / name, mask=key.startswith("mask"))
 		print(f"saved {name}")
+	print(f"finished: saved={len(pairs) - len(skipped)}, skipped={len(skipped)}")
 
 
 if __name__ == "__main__":
