@@ -3,9 +3,8 @@ from scipy import linalg
 from scipy.ndimage import map_coordinates
 from utils import unique, plot_matches, cv_draw_matches
 import cv2 as cv
-import matplotlib.pyplot as plt
 
-def mosaic_local_ori(im1, im2, H, X1_ok, X2_ok):
+def mosaic_local_ori(im1, im2, H, X1_ok, X2_ok, *, display=False, return_details=False, max_canvas_pixels=8000000):
     imsize1 = im1.shape[:2]
     imsize2 = im2.shape[:2]
 
@@ -22,13 +21,19 @@ def mosaic_local_ori(im1, im2, H, X1_ok, X2_ok):
                      [0, 0,              im2.shape[0]-1, im2.shape[0]-1],
                      [1, 1,              1,              1]])
     box2_ = linalg.solve(H, box2)
+    if not np.isfinite(box2_).all() or np.any(np.abs(box2_[2]) < 1e-8) or np.min(box2_[2]) * np.max(box2_[2]) <= 0:
+        raise ValueError("Unbounded projected canvas")
     box2_[0,:] = box2_[0,:] / box2_[2,:]
     box2_[1,:] = box2_[1,:] / box2_[2,:]
     u0 = min(0, min(box2_[0,:]))
     u1 = max(im1.shape[1]-1, max(box2_[0,:]))
-    ur = np.arange(u0, u1+1)
+    if not np.isfinite([u0, u1]).all():
+        raise ValueError("Non-finite canvas")
     v0 = min(0, min(box2_[1,:]))
     v1 = max(im1.shape[0]-1, max(box2_[1,:]))
+    if not np.isfinite([v0, v1]).all() or (np.ceil(u1-u0)+1)*(np.ceil(v1-v0)+1) > max_canvas_pixels:
+        raise ValueError("Projected canvas exceeds pixel limit")
+    ur = np.arange(u0, u1+1)
     vr = np.arange(v0, v1+1)
     mosaicw = len(ur)
     mosaich = len(vr)
@@ -82,6 +87,8 @@ def mosaic_local_ori(im1, im2, H, X1_ok, X2_ok):
     hyn = y1_ - y2
 
     n = len(x1_)
+    if n < 4 or np.linalg.matrix_rank(np.column_stack([x1_, y1_, np.ones(n)])) < 3:
+        raise ValueError("Insufficient non-collinear TPS controls")
     xx = np.repeat(x1_, n).reshape(n,n).T
     yy = np.repeat(y1_, n).reshape(n,n).T
     dist2 = (xx - xx.T)**2 + (yy - yy.T)**2
@@ -115,6 +122,8 @@ def mosaic_local_ori(im1, im2, H, X1_ok, X2_ok):
         if sum(outlier) < 0.0027*n:
             break
         ok = ~outlier
+        if ok.sum() < 4 or np.linalg.matrix_rank(np.column_stack([x1_[inlier_idx[ok]], y1_[inlier_idx[ok]], np.ones(ok.sum())])) < 3:
+            raise ValueError("TPS outlier rejection left insufficient controls")
         inlier_idx = inlier_idx[ok]
         K_ = K_[np.concatenate((ok, [True,True,True])),:][:,np.concatenate((ok, [True,True,True]))]
         G_ = G_[np.concatenate((ok, [True,True,True])),:]
@@ -136,9 +145,10 @@ def mosaic_local_ori(im1, im2, H, X1_ok, X2_ok):
     gxn = gxn[ok]
     hyn = hyn[ok]
 
-    img3 = cv_draw_matches(im1, im2, X1_nd, X2_nd, ok)
-    cv.imshow("Bayesian Refinement of Feature Matches", img3)
-    cv.waitKey(1)
+    if display:
+        img3 = cv_draw_matches(im1, im2, X1_nd, X2_nd, ok)
+        cv.imshow("Bayesian Refinement of Feature Matches", img3)
+        cv.waitKey(1)
     # plt.figure()
     # plot_matches(im1, im2, X1_nd, X2_nd, ok)
     # plt.title("Bayesian Refinement of Feature Matches")
@@ -154,7 +164,7 @@ def mosaic_local_ori(im1, im2, H, X1_ok, X2_ok):
         im1_p[:,:,kc] = map_coordinates(im1[:,:,kc], [v, u])
     mask1 = np.ones((im1.shape[0],im1.shape[1]))
     warped_mask1 = np.ones((im1_p.shape[0], im1_p.shape[1]))
-    warped_mask1 = map_coordinates(mask1, [v,u])
+    warped_mask1 = map_coordinates(mask1, [v,u], order=0)
 
     z_ = H[2,0] * u + H[2,1] * v + H[2,2]
     u_ = (H[0,0] * u + H[0,1] * v + H[0,2]) / z_
@@ -165,7 +175,7 @@ def mosaic_local_ori(im1, im2, H, X1_ok, X2_ok):
     hy_sub = np.zeros((int(np.ceil(imh_/intv_mesh)), int(np.ceil(imw_/intv_mesh))))
     for kf in range(n):
         dist2 = (u_im_ - x1_[kf])**2 + (v_im_ - y1_[kf])**2
-        rbf = 0.5 * dist2 * np.log(dist2)
+        rbf = 0.5 * dist2 * np.log(np.maximum(dist2, np.finfo(float).tiny))
         gx_sub = gx_sub + wx[kf]*rbf
         hy_sub = hy_sub + wy[kf]*rbf
     gx_sub = gx_sub + a[0]*u_im_ + a[1]*v_im_ + a[2]
@@ -186,7 +196,7 @@ def mosaic_local_ori(im1, im2, H, X1_ok, X2_ok):
     dist_vertical = np.maximum(sub_v0_-v_, v_-sub_v1_)
     dist_sub = np.maximum(dist_horizontal, dist_vertical)
     dist_sub = np.maximum(0, dist_sub)
-    eta = (eta_d1 - dist_sub) / (eta_d1 - eta_d0)
+    eta = np.ones_like(dist_sub) if eta_d1 <= 1e-12 else (eta_d1 - dist_sub) / (eta_d1 - eta_d0)
     eta[dist_sub < eta_d0] = 1
     eta[dist_sub > eta_d1] = 0
     gx = gx * eta
@@ -200,13 +210,18 @@ def mosaic_local_ori(im1, im2, H, X1_ok, X2_ok):
         im2_p[:,:,kc] = map_coordinates(im2[:,:,kc], [v_, u_])
     mask2 = np.ones((im2.shape[0],im2.shape[1]))
     warped_mask2 = np.ones((im2_p.shape[0], im2_p.shape[1]))
-    warped_mask2 = map_coordinates(mask2, [v_,u_])
+    if not np.isfinite(u_).all() or not np.isfinite(v_).all():
+        raise ValueError("Non-finite deformation")
+    warped_mask2 = map_coordinates(mask2, [v_,u_], order=0)
 
     mass = warped_mask1 + warped_mask2
-    mass[mass==0]=np.nan
+    mass[mass==0]=1
 
     mosaic = np.zeros_like(im1_p)
     for kc in range(3):
         mosaic[:,:,kc] = (im1_p[:,:,kc]*warped_mask1 + im2_p[:,:,kc]*warped_mask2) / mass
 
+    if return_details:
+        return mosaic, im1_p, im2_p, warped_mask1, warped_mask2
     return mosaic
+
