@@ -38,3 +38,31 @@ def test_only_common_slice_names_are_scheduled(tmp_path: Path):
 		("12", "slice_0001.jpg"),
 		("23", "slice_0002.jpg"),
 	]
+
+
+def test_result_summaries_separate_success_and_failure(tmp_path: Path):
+	from run_dataset import write_result_summaries
+
+	results = [
+		{
+			"case": "case001",
+			"pair": "12",
+			"slice_name": "slice_0001.jpg",
+			"status": "SUCCESS",
+			"output": "/output/success",
+		},
+		{
+			"case": "case001",
+			"pair": "23",
+			"slice_name": "slice_0001.jpg",
+			"status": "FAILED_H",
+			"message": "Only 3 RANSAC inliers; required 4",
+			"output": "/output/failure",
+		},
+	]
+
+	write_result_summaries(results, tmp_path)
+
+	assert (tmp_path / "successful_outputs.txt").read_text() == "/output/success"
+	assert "FAILED_H" in (tmp_path / "failed_jobs.csv").read_text()
+	assert '"successful": 1' in (tmp_path / "summary.json").read_text()

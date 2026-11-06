@@ -22,3 +22,11 @@ The paper does not disclose SLIC `K`; SIFT implementation settings; descriptor r
 ## ABUS-derived dataset adapter
 
 The dataset adapter treats `input2` as the target for both generated jobs. Pair `12` uses `input1` as reference and pair `23` uses `input3` as reference. Matching is by identical slice filename. `nipple_x.txt` is retained in `jobs.json` and `batch_status.json` as case metadata. The paper does not define a nipple-coordinate term in the two-image objective, so the adapter does not inject this value into registration or blending.
+
+## RANSAC acceptance threshold
+
+The paper states that RANSAC samples four feature correspondences but does not report an additional minimum-final-inlier threshold. An earlier reproduction default required eight final inliers, which rejected mathematically estimable cases such as a five-inlier homography. The default is now four. This does not guarantee that a four- or five-inlier transform is clinically reliable; users should inspect reprojection error, transformed geometry, overlap, and the saved checkerboards. A stricter threshold remains configurable.
+
+## No-ground-truth evaluation
+
+The paper reports PSNR and SSIM, but the available description does not fully specify the evaluation masks or whether the comparison is between registered inputs, fused output, or a ground-truth panorama. `scripts/evaluate_dataset.py` therefore labels three different comparisons explicitly and excludes invalid zero-padding. NCC, seam-band evaluation, and fusion-to-input consistency are engineering extensions. They must not be interpreted as physical registration accuracy.

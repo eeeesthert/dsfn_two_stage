@@ -1,6 +1,7 @@
 """Run the supported ABUS-derived two-dimensional dataset layout."""
 
 import argparse
+import csv
 import json
 import logging
 import sys
@@ -132,6 +133,53 @@ def run_jobs(jobs: list[PairJob], config_path: Path, mode: str) -> list[dict]:
 	return results
 
 
+def write_result_summaries(results: list[dict], output_root: Path) -> None:
+	"""Write human-readable success/failure indexes and aggregate counts."""
+
+	fieldnames = [
+		"case",
+		"pair",
+		"slice_name",
+		"status",
+		"message",
+		"ratio_matches",
+		"ransac_inliers",
+		"ransac_inlier_ratio",
+		"required_inliers",
+		"output",
+	]
+	with (output_root / "results.csv").open("w", newline="", encoding="utf8") as handle:
+		writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
+		writer.writeheader()
+		writer.writerows(results)
+	successes = [result for result in results if result.get("status") == "SUCCESS"]
+	failures = [result for result in results if result.get("status") != "SUCCESS"]
+	(output_root / "successful_outputs.txt").write_text(
+		"\n".join(result["output"] for result in successes),
+		encoding="utf8",
+	)
+	with (output_root / "failed_jobs.csv").open("w", newline="", encoding="utf8") as handle:
+		writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
+		writer.writeheader()
+		writer.writerows(failures)
+	counts = {}
+	for result in results:
+		key = result.get("status", "UNKNOWN")
+		counts[key] = counts.get(key, 0) + 1
+	(output_root / "summary.json").write_text(
+		json.dumps(
+			{
+				"total": len(results),
+				"successful": len(successes),
+				"failed": len(failures),
+				"status_counts": counts,
+			},
+			indent=2,
+		),
+		encoding="utf8",
+	)
+
+
 def parse_args() -> argparse.Namespace:
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--dataset-root", required=True, type=Path)
@@ -176,6 +224,7 @@ def main() -> int:
 	results = run_jobs(jobs, args.config, args.mode)
 	status_path = args.output / "batch_status.json"
 	status_path.write_text(json.dumps(results, indent=2), encoding="utf8")
+	write_result_summaries(results, args.output)
 	failed = sum(result.get("status") != "SUCCESS" for result in results)
 	LOG.info("Completed %d jobs with %d failures", len(results), failed)
 	return 0 if failed == 0 else 2

@@ -53,6 +53,11 @@ class PipelineError(RuntimeError):
 
 def run_pipeline(reference_path, target_path, output_dir, config, mode="full"):
 	start = time.time()
+	diagnostics = {
+		"mode": mode,
+		"reference": str(reference_path),
+		"target": str(target_path),
+	}
 	out = Path(output_dir)
 	[
 		(out / f"{i:02d}_{n}").mkdir(parents=True, exist_ok=True)
@@ -80,6 +85,8 @@ def run_pipeline(reference_path, target_path, output_dir, config, mode="full"):
 		re, te = enhance_ultrasound(rg, config["preprocessing"]), enhance_ultrasound(
 			tg, config["preprocessing"]
 		)
+		diagnostics["reference_size"] = list(rg.shape)
+		diagnostics["target_size"] = list(tg.shape)
 		LOG.info("Image size reference=%s target=%s", rg.shape, tg.shape)
 		for name, x in [
 			("reference_gray", normalize_image(rg)),
@@ -128,6 +135,16 @@ def run_pipeline(reference_path, target_path, output_dir, config, mode="full"):
 			len(rf.features),
 			len(tf.features),
 		)
+		diagnostics.update(
+			{
+				"reference_global_features": len(rglob.features),
+				"target_global_features": len(tglob.features),
+				"reference_region_features": len(rreg.features),
+				"target_region_features": len(treg.features),
+				"reference_merged_features": len(rf.features),
+				"target_merged_features": len(tf.features),
+			}
+		)
 		if min(len(rf.features), len(tf.features)) < config["sift"]["min_keypoints"]:
 			raise PipelineError("FAILED_FEATURE", "Too few SIFT keypoints")
 		for name, img, fs in [
@@ -156,6 +173,9 @@ def run_pipeline(reference_path, target_path, output_dir, config, mode="full"):
 			out / "04_matches/matches_after_ratio.png",
 			draw_matches(re, te, rf, tf, good),
 		)
+		diagnostics["raw_matches"] = len(raw)
+		diagnostics["ratio_matches"] = len(good)
+		diagnostics["match_type_counts"] = match_statistics(good)
 		if len(good) < 4:
 			raise PipelineError("FAILED_MATCH", f"Only {len(good)} matches")
 		rp = np.array(
@@ -184,8 +204,18 @@ def run_pipeline(reference_path, target_path, output_dir, config, mode="full"):
 			rr.inliers.mean(),
 			rr.errors[rr.inliers].mean(),
 		)
-		if rr.inliers.sum() < max(4, int(config["ransac"]["min_inliers"])):
-			raise PipelineError("FAILED_H", f"Only {rr.inliers.sum()} RANSAC inliers")
+		diagnostics["ransac_inliers"] = int(rr.inliers.sum())
+		diagnostics["ransac_inlier_ratio"] = float(rr.inliers.mean())
+		diagnostics["mean_inlier_reprojection_error"] = float(
+			rr.errors[rr.inliers].mean()
+		)
+		minimum_inliers = max(4, int(config["ransac"]["min_inliers"]))
+		diagnostics["required_inliers"] = minimum_inliers
+		if rr.inliers.sum() < minimum_inliers:
+			raise PipelineError(
+				"FAILED_H",
+				f"Only {rr.inliers.sum()} RANSAC inliers; required {minimum_inliers}",
+			)
 		kernels = build_gabor_filter_bank(config["gabor"])
 		rresp = apply_gabor_bank(re, kernels)
 		tresp = apply_gabor_bank(te, kernels)
@@ -327,6 +357,7 @@ def run_pipeline(reference_path, target_path, output_dir, config, mode="full"):
 		]
 		montage(vis, out / "pipeline_debug.png")
 		status = {
+			**diagnostics,
 			"status": "SUCCESS",
 			"runtime_seconds": time.time() - start,
 			"canvas_size": list(fused.shape[:2][::-1]),
@@ -343,6 +374,7 @@ def run_pipeline(reference_path, target_path, output_dir, config, mode="full"):
 		return status
 	except PipelineError as e:
 		status = {
+			**diagnostics,
 			"status": e.status,
 			"message": str(e),
 			"runtime_seconds": time.time() - start,

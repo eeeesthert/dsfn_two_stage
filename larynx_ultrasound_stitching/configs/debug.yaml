@@ -25,7 +25,7 @@ ransac:
   reprojection_threshold: 3.0 # reproduction assumption
   confidence: 0.995 # reproduction assumption
   max_iterations: 1000 # reproduction assumption
-  min_inliers: 8 # reproduction assumption
+  min_inliers: 4 # paper uses four-point samples; final-inlier minimum is not reported
   seed: 42 # reproduction assumption
 gabor:
   scales: 5 # specified by paper

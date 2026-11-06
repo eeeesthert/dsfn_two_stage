@@ -76,3 +76,30 @@ The implementation is intentionally grouped by responsibility instead of splitti
 * `src/pipeline.py` only orchestrates the complete workflow and its outputs.
 
 Python blocks use tab indentation throughout this package. Statements are kept on separate lines rather than joined with semicolons.
+
+## Inspecting batch results
+
+The batch runner writes these indexes beside the per-case output directories:
+
+* `summary.json` gives total, successful, failed, and per-status counts.
+* `results.csv` contains every job with match and RANSAC diagnostics.
+* `successful_outputs.txt` lists output directories that contain completed results.
+* `failed_jobs.csv` contains only failed jobs and their reason.
+* `batch_status.json` retains the complete machine-readable records.
+
+A successful output directory contains `final_stitched.png` and `status.json` with status `SUCCESS`. The paper specifies four-point RANSAC sampling but does not publish a stricter final-inlier cutoff. Consequently, `ransac.min_inliers` defaults to four; increase it when a dataset requires more conservative acceptance.
+
+## No-ground-truth batch evaluation
+
+Completed ABUS-derived jobs can be evaluated with:
+
+```bash
+python scripts/evaluate_dataset.py \
+	--output-root outputs/abus \
+	--out-csv outputs/abus/evaluation.csv \
+	--band-width 5
+```
+
+The evaluator reads each successful slice's `09_warp` and `10_fusion` outputs. It reports three comparisons separately: warped reference versus warped target (`registration`), fused image versus warped reference (`fused_reference`), and fused image versus warped target (`fused_target`). It never averages the two fusion sides into an unlabeled summary. Regions are restricted to valid support, overlap, and an overlap-boundary seam band, so zero-padded canvas pixels are not counted as image agreement.
+
+These MSE, PSNR, SSIM, and NCC values are no-ground-truth consistency measurements. They do not measure physical registration error and must not be presented as TRE or landmark accuracy. When landmarks or a known synthetic homography are available, use those as the primary registration evaluation.
