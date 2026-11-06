@@ -38,13 +38,15 @@ def HM_ransac(X1, X2, Nr, min_dis):
         
         score, best = max(score), np.argmax(score)
         ok = ok[best]
+        if score < 4:
+            raise ValueError("Insufficient RANSAC inliers")
         A = np.vstack((A1[ok,:], A2[ok,:]))
-        U,S,V = linalg.svd(A, 0)
+        U,S,V = linalg.svd(A, full_matrices=(A.shape[0] < 9))
         h = V.T[:,8]
         H = h.reshape(3,3)
     else:
         A = np.vstack((A1, A2))
-        U,S,V = linalg.svd(A, 0)
+        U,S,V = linalg.svd(A, full_matrices=(A.shape[0] < 9))
         h = V.T[:,8]
         H = h.reshape(3,3)
 

@@ -40,3 +40,4 @@ mosaic = mosaic_local_ori(im1, im2, H, X1_ok, X2_ok)
 cv.imwrite(data_path+'mosaic_REW.jpg', mosaic)
 cv.imshow("mosaic_REW", mosaic)
 cv.waitKey(0)
+

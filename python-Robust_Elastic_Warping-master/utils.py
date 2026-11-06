@@ -1,6 +1,5 @@
 import numpy as np
 import cv2 as cv
-import matplotlib.pyplot as plt
 
 def appendimages(im1, im2):
     rows1 = im1.shape[0]
@@ -12,6 +11,7 @@ def appendimages(im1, im2):
     return np.concatenate((im1, im2), axis=1)
 
 def plot_matches(im1, im2, locs1, locs2, ok):
+    import matplotlib.pyplot as plt
     im3 = appendimages(im1, im2)
     plt.imshow(im3[:,:,::-1])
     plt.plot(locs1[0,~ok], locs1[1,~ok], 'r.')
@@ -52,3 +52,4 @@ def cell(m, n=None):
 def unique(A):
     ar, idx = np.unique(A, return_index=True, axis=1)
     return ar, idx
+

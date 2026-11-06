@@ -166,3 +166,15 @@ python train_deephomography_abus.py \
 ## DunHuangStitch 对比实验（ABUS 输入适配）
 
 `DunHuangStitch/` 现已提供完整 ABUS 工作流：`train_alignment_abus.py` 在 12/23 图像对上训练共享配准网络，`generate_aligned_abus.py` 冻结配准并生成融合训练集，`train_fusion_abus.py` 训练融合网络，最后由 `inference_abus.py` 批量输出两阶段结果。适配器支持单图和 `inputN/slice_xxxx` 两种目录结构，不依赖 `nipple_x.txt`，并默认以 `--image-size 0 --batch-size 1` 保留 ABUS 原始分辨率。完整命令见 [`DunHuangStitch/README.md`](DunHuangStitch/README.md#abus-comparison-experiment)。
+
+## Robust Elastic Warping（REW）ABUS 离线适配
+
+直接修改了 `python-Robust_Elastic_Warping-master/`，本目录内的 `run_abus_pairwise.py` 支持统一的 `--manifest /path/to/pairs_manifest.csv --out-dir /path/to/output_root` 协议。入口原样使用 manifest 的 `case/stage/slice/prefix/left/right/left_x/right_x`，输出主项目命名的 warp、fusion、soft/bin mask 和 seam 文件。REW 无需训练，默认不缩放、不裁剪，保持原 SIFT + RANSAC + robust TPS 和平均融合。
+
+```bash
+python python-Robust_Elastic_Warping-master/run_abus_pairwise.py \
+  --manifest ./outputs/baseline_work/pairs_manifest.csv \
+  --out-dir ./outputs/baselines/rew
+```
+
+本目录可单独复制到离线服务器，运行时不依赖仓库根目录适配器。完整输入、输出和调度器对接说明见 [`python-Robust_Elastic_Warping-master/README.md`](python-Robust_Elastic_Warping-master/README.md)。REW 的 seam 文件表示原始平均融合权重；几何有效区与融合权重分开导出。评价继续复用现有脚本。本次不运行 ABUS 实验。
