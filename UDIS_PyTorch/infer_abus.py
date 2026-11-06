@@ -1,88 +1,113 @@
-"""Run the unchanged two-stage UDIS method over an ABUS case hierarchy."""
+"""Run the two-stage UDIS baseline on the repository's native ABUS layout."""
 
-import sys
-from pathlib import Path as _BootstrapPath
-
-sys.path.insert(0, str(_BootstrapPath(__file__).resolve().parent.parent))
+from __future__ import annotations
 
 import argparse
+import csv
+import sys
 from pathlib import Path
 
 import torch
 
-from UDIS_PyTorch.datasets import ABUSPairDataset
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from UDIS_PyTorch.datasets import ImagePair, scan_abus_pairs
 from UDIS_PyTorch.models.alignment import AlignmentPipeline
-from UDIS_PyTorch.models.reconstruction_net import ReconstructionNet
-from UDIS_PyTorch.utils.utilities import save_image
+from UDIS_PyTorch.models.reconstruction import ReconstructionNet
+from UDIS_PyTorch.utils.image import load_rgb, save_image
 
 
-def load_models(arguments, device):
-	"""Load independently trained UDIS alignment and reconstruction stages."""
-	align = AlignmentPipeline().to(device)
-	reconstruct = ReconstructionNet().to(device)
-	align_state = torch.load(arguments.alignment_ckpt, map_location=device)
-	reconstruction_state = torch.load(arguments.reconstruction_ckpt, map_location=device)
-	align.net.load_state_dict(align_state.get("model", align_state))
-	reconstruct.load_state_dict(reconstruction_state.get("model", reconstruction_state))
-	align.eval()
-	reconstruct.eval()
-	return align, reconstruct
-
-
-def save_eval_pairwise_result(output, root, stage, case_name, slice_name):
-	"""Write the names and hierarchy consumed by ``eval_pairwise_no_gt.py``."""
-	fusion_dir = root / stage / case_name / "fusion"
-	warp_dir = root / stage / case_name / "warp"
-	fusion_dir.mkdir(parents=True, exist_ok=True)
-	warp_dir.mkdir(parents=True, exist_ok=True)
-	prefix = f"{stage}_{slice_name}"
-	save_image(output["stitched"][0], fusion_dir / f"{prefix}_stitched.png")
-	save_image(output["mask1"][0], fusion_dir / f"{prefix}_mask_left_soft.png", mask=True)
-	save_image(output["mask2"][0], fusion_dir / f"{prefix}_mask_right_soft.png", mask=True)
-	save_image(output["warp1"][0], warp_dir / f"{prefix}_warp_left.png")
-	save_image(output["warp2"][0], warp_dir / f"{prefix}_warp_right.png")
-
-
-def run_stage(align, reconstruct, dataset_root, output_root, stage, device):
-	dataset = ABUSPairDataset(dataset_root, stage)
-	for sample in dataset:
-		image1 = sample["image1"][None].to(device)
-		image2 = sample["image2"][None].to(device)
-		aligned = align(image1, image2)
-		reconstructed = reconstruct(aligned["warp1"], aligned["warp2"])
-		result = {
-			**aligned,
-			"stitched": reconstructed["hr"],
-		}
-		save_eval_pairwise_result(
-			result,
-			output_root,
-			stage,
-			sample["case"],
-			sample["slice"],
-		)
-
-
-def main():
-	parser = argparse.ArgumentParser(description="UDIS inference for three-view ABUS slices")
-	parser.add_argument("--dataset-root", default="./dataset")
-	parser.add_argument("--alignment-ckpt", required=True)
-	parser.add_argument("--reconstruction-ckpt", required=True)
-	parser.add_argument("--out-dir", default="./udis_outputs/results")
+def parse_args() -> argparse.Namespace:
+	parser = argparse.ArgumentParser(description=__doc__)
+	parser.add_argument("--dataset-root", type=Path, required=True)
+	parser.add_argument("--alignment-ckpt", type=Path, required=True)
+	parser.add_argument("--reconstruction-ckpt", type=Path, required=True)
+	parser.add_argument("--out-dir", type=Path, default=Path("outputs/udis_abus"))
+	parser.add_argument(
+		"--stages", nargs="+", choices=("12", "23"), default=("12", "23")
+	)
 	parser.add_argument("--cpu", action="store_true")
-	arguments = parser.parse_args()
-	device = torch.device("cpu" if arguments.cpu or not torch.cuda.is_available() else "cuda")
-	align, reconstruct = load_models(arguments, device)
+	return parser.parse_args()
+
+
+def load_models(args: argparse.Namespace, device: torch.device):
+	alignment = AlignmentPipeline().to(device)
+	reconstruction = ReconstructionNet().to(device)
+	alignment_state = torch.load(args.alignment_ckpt, map_location=device)
+	reconstruction_state = torch.load(args.reconstruction_ckpt, map_location=device)
+	alignment.net.load_state_dict(alignment_state["model"])
+	reconstruction.load_state_dict(reconstruction_state["model"])
+	alignment.eval()
+	reconstruction.eval()
+	return alignment, reconstruction
+
+
+def output_directory(root: Path, pair: ImagePair) -> Path:
+	"""Use the same stage/case convention as the repository evaluation tools."""
+	path = root / pair.stage / pair.case / "fusion"
+	path.mkdir(parents=True, exist_ok=True)
+	return path
+
+
+def save_result(root: Path, pair: ImagePair, aligned, reconstructed) -> dict[str, str]:
+	prefix = f"{pair.stage}_{pair.slice_id}"
+	directory = output_directory(root, pair)
+	paths = {
+		"stitched": directory / f"{prefix}_stitched.png",
+		"warp1": directory / f"{prefix}_warp1.png",
+		"warp2": directory / f"{prefix}_warp2.png",
+		"mask_left": directory / f"{prefix}_mask_left_soft.png",
+		"mask_right": directory / f"{prefix}_mask_right_soft.png",
+	}
+	save_image(reconstructed["hr"][0], paths["stitched"])
+	save_image(aligned["warp1"][0], paths["warp1"])
+	save_image(aligned["warp2"][0], paths["warp2"])
+	save_image(aligned["mask1"][0], paths["mask_left"], mask=True)
+	save_image(aligned["mask2"][0], paths["mask_right"], mask=True)
+	return {key: str(value) for key, value in paths.items()}
+
+
+def run_pair(
+	pair: ImagePair, alignment, reconstruction, device: torch.device, root: Path
+):
+	image1 = load_rgb(pair.image1)[None].to(device)
+	image2 = load_rgb(pair.image2)[None].to(device)
+	if image1.shape != image2.shape:
+		raise ValueError(
+			"ABUS pair dimensions differ and UDIS does not crop or resize original input: "
+			f"{pair.image1}={tuple(image1.shape[-2:])}, {pair.image2}={tuple(image2.shape[-2:])}"
+		)
 	with torch.no_grad():
-		for stage in ("12", "23"):
-			run_stage(
-				align,
-				reconstruct,
-				arguments.dataset_root,
-				Path(arguments.out_dir),
-				stage,
-				device,
+		aligned = alignment(image1, image2)
+		reconstructed = reconstruction(aligned["warp1"], aligned["warp2"])
+	return save_result(root, pair, aligned, reconstructed)
+
+
+def main() -> None:
+	args = parse_args()
+	device = torch.device(
+		"cpu" if args.cpu or not torch.cuda.is_available() else "cuda"
+	)
+	alignment, reconstruction = load_models(args, device)
+	rows = []
+	for stage in args.stages:
+		for pair in scan_abus_pairs(args.dataset_root, stage):
+			paths = run_pair(pair, alignment, reconstruction, device, args.out_dir)
+			rows.append(
+				{"case": pair.case, "slice": pair.slice_id, "stage": stage, **paths}
 			)
+			print(f"stage={stage} case={pair.case} slice={pair.slice_id}")
+
+	args.out_dir.mkdir(parents=True, exist_ok=True)
+	with (args.out_dir / "outputs.csv").open(
+		"w", newline="", encoding="utf8"
+	) as stream:
+		writer = csv.DictWriter(
+			stream, fieldnames=rows[0].keys() if rows else ("case", "slice", "stage")
+		)
+		writer.writeheader()
+		writer.writerows(rows)
+	print(f"saved {len(rows)} ABUS results to {args.out_dir}")
 
 
 if __name__ == "__main__":

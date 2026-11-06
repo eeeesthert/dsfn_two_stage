@@ -11,10 +11,9 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from UDIS_PyTorch.datasets import ReconstructionDataset
 from UDIS_PyTorch.losses.reconstruction_loss import ReconstructionLoss
-from UDIS_PyTorch.models.reconstruction_net import ReconstructionNet
-from UDIS_PyTorch.models.vgg_perceptual import VGGPerceptualExtractor
-from UDIS_PyTorch.utils.utilities import load_checkpoint, save_checkpoint
-from UDIS_PyTorch.utils.utilities import set_seed
+from UDIS_PyTorch.models.reconstruction import ReconstructionNet
+from UDIS_PyTorch.models.reconstruction import VGGPerceptualExtractor
+from UDIS_PyTorch.utils import load_checkpoint, save_checkpoint, set_seed
 
 
 def main():
@@ -78,7 +77,9 @@ def main():
 			if k.endswith("loss"):
 				writer.add_scalar(k, v, step)
 		if step % 1000 == 0:
-			save_checkpoint(out / "reconstruction_latest.pth", model, opt, step, cfg, sch)
+			save_checkpoint(
+				out / "reconstruction_latest.pth", model, opt, step, cfg, sch
+			)
 
 
 if __name__ == "__main__":

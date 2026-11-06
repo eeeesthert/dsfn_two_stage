@@ -2,7 +2,7 @@
 
 from torch import nn
 from .alignment import AlignmentPipeline
-from .reconstruction_net import ReconstructionNet
+from .reconstruction import ReconstructionNet
 
 
 class UDIS(nn.Module):

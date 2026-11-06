@@ -2,8 +2,8 @@
 
 import torch
 from torch.nn import functional as F
-from UDIS_PyTorch.models.dlt import DifferentiableDLT
-from UDIS_PyTorch.models.homography_warp import homography_warp
+from UDIS_PyTorch.models.alignment import DifferentiableDLT
+from UDIS_PyTorch.models.alignment import homography_warp
 
 
 class AlignmentLoss(torch.nn.Module):
@@ -15,7 +15,11 @@ class AlignmentLoss(torch.nn.Module):
 	def forward(self, image1, image2, pred):
 		a = F.interpolate(image1, (128, 128), mode="bilinear", align_corners=False)
 		b = F.interpolate(image2, (128, 128), mode="bilinear", align_corners=False)
-		cumulative = (pred["delta1"], pred["delta1"] + pred["delta2"], pred["delta_final"])
+		cumulative = (
+			pred["delta1"],
+			pred["delta1"] + pred["delta2"],
+			pred["delta_final"],
+		)
 		values = []
 		warps = []
 		for d in cumulative:

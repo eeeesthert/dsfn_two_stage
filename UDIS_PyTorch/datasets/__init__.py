@@ -1,8 +1,17 @@
-from .datasets import ABUSPairDataset, AlignmentDataset, ReconstructionDataset, SyntheticHomographyDataset
+"""Public dataset API."""
+
+from .data import (
+	AlignmentDataset,
+	ImagePair,
+	ReconstructionDataset,
+	SyntheticHomographyDataset,
+	scan_abus_pairs,
+)
 
 __all__ = [
-	"ABUSPairDataset",
 	"AlignmentDataset",
+	"ImagePair",
 	"ReconstructionDataset",
 	"SyntheticHomographyDataset",
+	"scan_abus_pairs",
 ]

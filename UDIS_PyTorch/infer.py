@@ -8,8 +8,8 @@ import argparse
 from pathlib import Path
 import torch
 from UDIS_PyTorch.models.alignment import AlignmentPipeline
-from UDIS_PyTorch.models.reconstruction_net import ReconstructionNet
-from UDIS_PyTorch.utils.utilities import load_rgb, save_image
+from UDIS_PyTorch.models.reconstruction import ReconstructionNet
+from UDIS_PyTorch.utils.image import load_rgb, save_image
 
 
 def main():

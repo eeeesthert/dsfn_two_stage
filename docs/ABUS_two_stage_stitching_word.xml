@@ -1,0 +1,4465 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
+  <pkg:part pkg:name="/_rels/.rels" pkg:contentType="application/vnd.openxmlformats-package.relationships+xml">
+    <pkg:xmlData>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+</pkg:xmlData>
+  </pkg:part>
+  <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
+    <pkg:xmlData>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+<w:body>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Title"/>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">基于结构先验的多视图 ABUS 两阶段无监督图像拼接</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Word 可编辑版本（公式为 Office Math，表格为原生 Word 表格）</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading1"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">1  Introduction</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">超声成像具有无放射、非侵入、实时和低成本等优势。自动化三维乳腺超声（ABUS）能够降低手持扫描对操作者经验的依赖，但受探头尺寸限制，单侧乳房通常需采集外侧位（LAT）、前后位（AP）和内侧位（MED）。因此，将具有重叠区域的多视图图像拼接为宽视野图像具有重要意义。</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">传统方法依赖 SIFT、SURF、ORB 等人工特征与 RANSAC 变换估计；超声图像的低对比度、散斑噪声和软组织形变使这些特征不够稳定。深度学习能够学习更鲁棒的表示，但针对多视图 ABUS 的工作仍较少。本文提出基于乳头结构先验的两阶段无监督框架：首先完成全局单应与局部 TPS 配准，再估计软接缝和逐像素融合权重。</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading2"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">主要贡献</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">（1）利用三维 ABUS 中乳头的 z 坐标初始化冠状面纵向位置，并利用 x 坐标构造结构先验；（2）以共享多尺度编码器、全局单应和局部 TPS 学习复杂形变；（3）在无人工配准真值条件下，以图像自身的一致性训练配准与融合网络。</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading1"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">2  Related works</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading2"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">2.1  Non-learning based image stitching methods</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">传统流程由特征提取、匹配、几何估计和融合组成。APAP、半投影形变、全局相似性先验、点线一致性、弹性形变和接缝优化分别从局部几何、整体形状和视觉连续性改善自然图像拼接。针对超声，已有方法结合超像素、轮廓角点、块匹配、3D SIFT、传感器导航和体数据无缝融合，但通常仍依赖人工特征、显式优化或预定义模型。</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading2"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">2.2  Learning-based image stitching methods</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">无监督深度拼接逐步将特征、变换和融合变为可学习模块，并由全局单应扩展到 TPS、像素级形变与边界规整。超声领域已有胎儿三维复合、SynStitch、LOTUS、DFMH-Net、VFMStitch 等工作。ABUS 研究则更多关注病灶检测、定位和单视图重建，LAT、AP、MED 原始数据的连续配准与自然融合仍有不足。</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading1"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">3  Method</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">原始输入为不同扫描视图的三维 ABUS 体数据。首先依据乳头 z 坐标沿 y 方向粗对齐冠状面；随后将图像输入两阶段网络。左图 I_L 为源图像，右图 I_R 为固定参考图像。</w:t>
+</w:r>
+</w:p>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>I_L^w = GridSample(I_L, G_final),    I_R^w = I_R    (1)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading2"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">3.1  3D Spatial Initialization</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">乳头 z 坐标提供不同体数据在切片方向上的初始位置；粗初始化后，二维网络估计精细变换。乳头 x 坐标进一步参与无监督损失和扩展画布定位，形成三维初始化与二维精配准的两级约束。</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading2"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">3.2  Coarse-to-Fine Geometric Alignment</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">共享 ResNet-50 编码器输出 1/16 与 1/8 尺度特征。粗阶段在相同空间位置计算归一化特征相关性，经 FCA 聚合并回归四角点偏移；DLT 据此计算单应矩阵。</w:t>
+</w:r>
+</w:p>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>C(x,y) = Σ_(c=1)^(C_f) F̂_L^(1/16)(c,x,y) F̂_R^(1/16)(c,x,y)    (2)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>H_c = DLT(P, P + ΔP)    (3)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">局部阶段预测 9×9 控制点位移，以 TPS 平滑插值，降低逐像素位移的自由度并保持空间连续性。</w:t>
+</w:r>
+</w:p>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>Δ(p) = a_0 + a_x p_x + a_y p_y + Σ_(i=1)^N w_i U(‖p-c_i‖_2),    U(r)=r² ln(r²+ε)    (4)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>G_final = G_H + Δ,    G_H(x)=π(H_c^(-1) x̃)    (5)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading3"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">3.2.1  ABUS Structural Prior</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">以乳头横向坐标为中心构造沿图像高度复制的高斯权重。左右响应的逐点最大值形成 H_nip；它表示乳头所在纵向带状区域，而非二维关键点距离。</w:t>
+</w:r>
+</w:p>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>H_x(x,y) = exp(-(x-x_nip)²/(2σ²))    (6)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading3"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">3.2.2  Alignment Loss Function</w:t>
+</w:r>
+</w:p>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>L_warp = λ_1 L_L1 + λ_e L_edge + λ_a L_angle + λ_n L_nipple    (7)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>L_L1 = [Σ_p Ω(p)|I_L^w(p)-I_R^w(p)|]/[Σ_p Ω(p)+ε]    (8)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>L_edge = mean|‖e^x‖_2-l_x^0| + mean|‖e^y‖_2-l_y^0|    (9)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>L_angle = mean |(e^x·e^y)/(‖e^x‖_2 ‖e^y‖_2+ε)|    (10)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>L_nipple = (1/HW) Σ_p H_nip(p) mean_c |I_L^w(p)-I_R^w(p)|    (11)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading2"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">3.3  Seam-aware Image Fusion</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">由非零区域获得有效掩膜及重叠区域 Ω。在 Ω 内计算均值和标准差，将参考图像统计分布匹配到源图像，并通过重叠掩膜局部平均得到平滑权重 α，使强度校正主要作用于重叠区附近。</w:t>
+</w:r>
+</w:p>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>I_R^m = α[(I_R^w-μ_R) σ_L/(σ_R+ε)+μ_L] + (1-α)I_R^w    (12)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>D = |I_L^w-I_R^m|    (13)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">U-Net 型网络使用膨胀率 1、2、4 的空洞卷积，并将多尺度差分特征注入解码器跳跃连接。输出经 1×1 卷积和 Sigmoid 得到 soft seam，经 mask refinement 获得归一化权重。</w:t>
+</w:r>
+</w:p>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>S_soft = sigmoid(f_seam(d_1))    (14)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>I_stitch = M_L ⊙ I_L^w + M_R ⊙ I_R^m    (15)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading3"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">3.3.1  Fusion Loss Function</w:t>
+</w:r>
+</w:p>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>L_fusion = λ_s L_smooth + λ_seam L_seam + λ_ncc L_NCC    (16)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>L_smooth = (1/HW) Σ_p (|∇_x I_stitch(p)|+|∇_y I_stitch(p)|)    (17)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>L_seam = [Σ_(p∈B_seam)|I_L^w(p)-I_R^w(p)|]/[|B_seam|+ε]    (18)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<m:oMathPara>
+<m:oMath>
+<m:r>
+<m:t>L_NCC = 1-NCC(S,R)    (19)</m:t>
+</m:r>
+</m:oMath>
+</m:oMathPara>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading1"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">4  Experiments and Results</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading2"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">4.1  Experimental Setup</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">数据规模、训练/验证/测试划分、优化器、初始学习率、batch size、epoch 数及 GPU 型号在原稿中仍以 XXX 占位，需在投稿前补充。各方法使用相同测试图像对和评价区域。</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading2"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">4.2  Evaluation Metrics</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">在 Overlap region 评价共同组织的空间对齐，在 Seam-band region 评价融合边界连续性。采用 PSNR、SSIM、NCC 与 MSE；前三者越高越好，MSE 越低越好，表中 MSE 以 ×10⁻² 报告。Seam-band 宽度仍需补充。</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">表 1  与传统拼接方法的定量比较</w:t>
+</w:r>
+</w:p>
+<w:tbl>
+<w:tblPr>
+<w:tblStyle w:val="TableGrid"/>
+<w:tblW w:w="0" w:type="auto"/>
+</w:tblPr>
+<w:tblGrid>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+</w:tblGrid>
+<w:tr>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">Method</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">Region</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">PSNR ↑</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">SSIM ↑</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">NCC ↑</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">MSE (×10⁻²) ↓</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">APAP</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">18.2838</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8072</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8299</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">10.3744</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">APAP</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">15.6639</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.5453</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.5817</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">25.0717</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Identity</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">18.4195</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8224</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8412</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">9.7070</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Identity</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">15.7846</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.5565</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.5938</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">23.3924</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">ORB</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">18.3647</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8191</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8388</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">9.9271</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">ORB</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">15.7096</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.5535</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.5907</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">23.8918</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">SIFT</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">18.2821</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8112</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8323</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">10.2923</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">SIFT</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">15.5306</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.5453</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.5818</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">25.0504</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">SPC</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">23.8917</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.9203</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.9244</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">3.3365</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">SPC</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">18.6392</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.7962</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.7993</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">10.1799</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">SPW</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">18.3519</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8113</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8321</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">10.1501</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">SPW</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">15.7080</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.5493</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.5852</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">24.3751</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Ours</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">25.8735</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.9421</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.9494</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">1.9101</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Ours</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">19.3104</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8338</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8488</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">8.0505</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+</w:tbl>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">本文方法在 Overlap 四项指标上均最优；相对 SPC，PSNR 提升 1.9818 dB，MSE 从 3.3365×10⁻² 降至 1.9101×10⁻²。在 Seam-band 中也取得传统方法中的最佳结果。</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">表 2  与学习式拼接方法的定量比较</w:t>
+</w:r>
+</w:p>
+<w:tbl>
+<w:tblPr>
+<w:tblStyle w:val="TableGrid"/>
+<w:tblW w:w="0" w:type="auto"/>
+</w:tblPr>
+<w:tblGrid>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+</w:tblGrid>
+<w:tr>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">Method</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">Region</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">PSNR ↑</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">SSIM ↑</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">NCC ↑</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">MSE (×10⁻²) ↓</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">UDH</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">21.4908</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8638</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8509</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">7.4123</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">UDH</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">19.1482</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.6812</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.6313</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">16.7992</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">UDIS++</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">21.9370</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8645</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8782</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">7.1310</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">UDIS++</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">20.0517</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.5934</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.5669</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">38.2514</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">DH</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">18.5590</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.7227</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.6865</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">15.7635</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">DH</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">20.5685</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.7107</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.6558</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">12.4232</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Ours</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">25.8735</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.9421</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.9494</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">1.9101</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Ours</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">19.3104</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8338</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8488</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">8.0505</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+</w:tbl>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">本文方法在 Overlap 全部指标最佳。在 Seam-band，DH 的 PSNR 较高，但本文方法的 SSIM、NCC 和 MSE 最优，说明其更好地保持组织结构与灰度变化一致性。</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading2"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">4.3  Ablation Study</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">表 3  编码器与预训练策略消融</w:t>
+</w:r>
+</w:p>
+<w:tbl>
+<w:tblPr>
+<w:tblStyle w:val="TableGrid"/>
+<w:tblW w:w="0" w:type="auto"/>
+</w:tblPr>
+<w:tblGrid>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+</w:tblGrid>
+<w:tr>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">Encoder</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">Pre-training</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">Region</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">PSNR ↑</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">SSIM ↑</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">NCC ↑</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">MSE ↓</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">ResNet50</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">ImageNet</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">25.8735</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.9421</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.9494</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">1.9101</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">ResNet50</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">ImageNet</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">19.3104</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8338</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8488</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">8.0505</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">ResNet50</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">RadImageNet</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">21.9196</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8462</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8541</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">4.5119</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">ResNet50</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">RadImageNet</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">19.5635</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.6724</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.6994</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">9.7925</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">DenseNet121</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">ImageNet</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">21.9496</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8476</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8555</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">4.4773</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">DenseNet121</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">ImageNet</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">19.6781</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.6767</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.7034</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">9.5274</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">DenseNet121</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">RadImageNet</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">21.8961</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8456</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8537</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">4.5258</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">DenseNet121</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">RadImageNet</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">19.7257</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.6748</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.7019</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">9.5854</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">InceptionV3</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">ImageNet</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">21.9809</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8479</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8561</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">4.4548</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">InceptionV3</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">ImageNet</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">19.5944</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.6746</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.7017</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">9.6605</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">InceptionV3</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">RadImageNet</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">22.0545</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8442</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8577</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">4.3393</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">InceptionV3</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">RadImageNet</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">19.6657</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.6701</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.6926</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">9.4309</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+</w:tbl>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">ResNet50 + ImageNet 在 Overlap 综合最佳，并在 Seam-band 的 SSIM、NCC 和 MSE 上最佳，因此作为默认配置。</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">表 4  乳头结构先验与 NCC 损失消融</w:t>
+</w:r>
+</w:p>
+<w:tbl>
+<w:tblPr>
+<w:tblStyle w:val="TableGrid"/>
+<w:tblW w:w="0" w:type="auto"/>
+</w:tblPr>
+<w:tblGrid>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+<w:gridCol w:w="1800"/>
+</w:tblGrid>
+<w:tr>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">Configuration</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">Region</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">PSNR ↑</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">SSIM ↑</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">NCC ↑</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+<w:shd w:fill="D9EAF7"/>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:rPr>
+<w:b/>
+</w:rPr>
+<w:t xml:space="preserve">MSE (×10⁻²) ↓</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">w/o Nipple</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">20.9036</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8401</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8497</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">5.6727</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">w/o Nipple</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">19.8479</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.7339</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.7649</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">9.0950</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">w/o NCC</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">25.2239</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8863</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8911</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">2.8849</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">w/o NCC</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">20.1893</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.6952</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.6950</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">13.2081</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Full</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Overlap</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">25.8735</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.9421</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.9494</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">1.9101</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+<w:tr>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Full</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">Seam-band</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">19.3104</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8338</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">0.8488</w:t>
+</w:r>
+</w:p>
+</w:tc>
+<w:tc>
+<w:tcPr>
+</w:tcPr>
+<w:p>
+<w:pPr>
+<w:jc w:val="center"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">8.0505</w:t>
+</w:r>
+</w:p>
+</w:tc>
+</w:tr>
+</w:tbl>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">去除乳头先验使 Overlap PSNR 从 25.8735 降至 20.9036；去除 NCC 后 Seam-band 的 SSIM、NCC 明显下降且 MSE 上升。完整模型在几何对齐与融合连续性之间最均衡。</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading1"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">5  Discussion</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">该方法虽然输出二维冠状面拼接，却利用三维 ABUS 的乳头坐标辅助配准。当前仍以 pairwise stitching 为基本任务，尚未显式约束 LAT、AP、MED 的整体空间一致性。后续可在统一乳腺坐标系中联合估计三视图关系，并进一步扩展到完整体数据的三维形变、融合与跨设备验证。多模态配准、术前规划与导航仍属于尚未验证的研究方向。</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading1"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">6  Conclusion</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">本文提出基于结构先验的两阶段无监督 ABUS 拼接方法，以全局单应和 TPS 补偿几何变化，以乳头位置约束多视图配准，并以接缝感知网络完成自适应融合。实验及消融结果表明，结构先验改善空间对齐，NCC 约束有助于保持融合区域结构与灰度一致性。未来将研究三维、多视图联合建模及跨域泛化。</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+<w:pStyle w:val="Heading1"/>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">References</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[1] Boca et al. Pros and cons for automated breast ultrasound (ABUS): A narrative review. Journal of Personalized Medicine, 2021.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[2] Fischler and Bolles. Random sample consensus. Communications of the ACM, 1981.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[3] Brown and Lowe. Automatic panoramic image stitching using invariant features. IJCV, 2007.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[4] Zaragoza et al. As-projective-as-possible image stitching with moving DLT. CVPR, 2013.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[5] Che, Mathai, and Galeotti. Ultrasound registration: A review. Methods, 2017.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[6] Yan et al. Larynx ultrasound image stitching based on multiconstraint super-pixel feature. IEEE TIM, 2023.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[7] Jiang et al. Ultrasound image stitching fusion based on contour corner points. SIVP, 2025.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[8] Wright et al. Complete fetal head compounding from multi-view 3DUS. MICCAI, 2019.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[9] Wright et al. Fast fetal head compounding from multi-view 3D ultrasound. Medical Image Analysis, 2023.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[10] Yao et al. SynStitch. IEEE ISBI, 2025.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[11] Yao et al. LOTUS. MIDL, 2026.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[12] Yan et al. Deep feature masking and homograph for cranial and larynx ultrasound image stitching. JUM, 2026.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[13] Yao et al. VFMStitch. MIDL, 2026.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[14] Lowe. Object recognition from local scale-invariant features. ICCV, 1999.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[15] Bay et al. Speeded-up robust features (SURF). CVIU, 2008.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[16] Rublee et al. ORB. ICCV, 2011.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[17] Chang et al. Shape-preserving half-projective warps. CVPR, 2014.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[18] Chen and Chuang. Natural image stitching with the global similarity prior. ECCV, 2016.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[19] Jia et al. Leveraging line-point consistence. CVPR, 2021.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[20] Du et al. Geometric structure preserving warp. CVPR, 2022.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[21] Liao and Li. Natural image stitching using depth maps. arXiv:2202.06276, 2023.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[22] Zhang and Liu. Parallax-tolerant image stitching. CVPR, 2014.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[23] Gao et al. Seam-driven image stitching. Eurographics, 2013.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[24] Lin et al. SEAGULL. ECCV, 2016.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[25] Li et al. Parallax-tolerant image stitching based on robust elastic warping. IEEE TMM, 2018.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[26] Li et al. Perception-based seam cutting. SIVP, 2018.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[27] Liao et al. Quality evaluation-based iterative seam estimation. SIVP, 2019.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[28] Peng et al. Seamless UAV hyperspectral image stitching. IEEE TGRS, 2023.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[29] Banerjee et al. Fast and robust 3D ultrasound registration. Medical Image Analysis, 2015.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[30] Freesmeyer et al. Stitching of sensor-navigated 3D ultrasound datasets. Medical Ultrasonography, 2018.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[31] Seifert et al. Optimization of thyroid volume determination by stitched 3D ultrasound. Biomedicines, 2023.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[32] Ni et al. Volumetric ultrasound panorama based on 3D SIFT. MICCAI, 2008.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[33] Flach et al. PURE. Springer, 2016.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[34] Gomez et al. Fast registration of 3D fetal ultrasound images. Springer, 2017.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[35] Chang et al. Rapid image stitching for multipass ABUS. Medical Physics, 2010.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[36] Nie et al. Unsupervised deep image stitching. IEEE TIP, 2021.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[37] Nie et al. Parallax-tolerant unsupervised deep image stitching. ICCV, 2023.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[38] Jia et al. Learning pixel-wise alignment. ACM MM, 2023.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[39] Kweon et al. Pixel-wise warping for deep image stitching. AAAI, 2023.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[40] Nie et al. Deep rectangling for image stitching. CVPR, 2022.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[41] Xie et al. Reconstructing the image stitching pipeline. NeurIPS, 2024.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[42] Gomez et al. Whole-fetus ultrasound imaging by patch manifolds. Springer, 2019.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[43] Yao et al. From geometry to intensity. SPIE, 2026.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[44] 章浩伟等. 基于自动乳腺超声的肿瘤定位与三维重建系统. 北京生物医学工程, 2024.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[45] 曾焕城, 陈嘉炜. 基于 YOLOv5 模型的自动乳腺超声乳头目标检测. 中国医疗器械信息, 2024.</w:t>
+</w:r>
+</w:p>
+<w:p>
+<w:pPr>
+</w:pPr>
+<w:r>
+<w:t xml:space="preserve">[46] 耿如霞等. 一种自动化三维乳腺超声全景图的自动拼接算法. 电子测量技术, 2021.</w:t>
+</w:r>
+</w:p>
+<w:sectPr>
+<w:pgSz w:w="11906" w:h="16838"/>
+<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+</w:sectPr>
+</w:body>
+</w:document>
+</pkg:xmlData>
+  </pkg:part>
+  <pkg:part pkg:name="/word/styles.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml">
+    <pkg:xmlData>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+<w:name w:val="Normal"/>
+<w:rPr>
+<w:rFonts w:ascii="Times New Roman" w:eastAsia="宋体"/>
+<w:sz w:val="21"/>
+</w:rPr>
+<w:pPr>
+<w:spacing w:line="360" w:lineRule="auto"/>
+<w:jc w:val="both"/>
+</w:pPr>
+</w:style>
+<w:style w:type="paragraph" w:styleId="Title">
+<w:name w:val="Title"/>
+<w:basedOn w:val="Normal"/>
+<w:rPr>
+<w:b/>
+<w:sz w:val="32"/>
+</w:rPr>
+</w:style>
+<w:style w:type="paragraph" w:styleId="Heading1">
+<w:name w:val="heading 1"/>
+<w:basedOn w:val="Normal"/>
+<w:rPr>
+<w:b/>
+<w:sz w:val="28"/>
+</w:rPr>
+</w:style>
+<w:style w:type="paragraph" w:styleId="Heading2">
+<w:name w:val="heading 2"/>
+<w:basedOn w:val="Normal"/>
+<w:rPr>
+<w:b/>
+<w:sz w:val="24"/>
+</w:rPr>
+</w:style>
+<w:style w:type="paragraph" w:styleId="Heading3">
+<w:name w:val="heading 3"/>
+<w:basedOn w:val="Normal"/>
+<w:rPr>
+<w:b/>
+<w:i/>
+<w:sz w:val="22"/>
+</w:rPr>
+</w:style>
+<w:style w:type="table" w:styleId="TableGrid">
+<w:name w:val="Table Grid"/>
+<w:tblPr>
+<w:tblBorders>
+<w:top w:val="single" w:sz="4"/>
+<w:left w:val="single" w:sz="4"/>
+<w:bottom w:val="single" w:sz="4"/>
+<w:right w:val="single" w:sz="4"/>
+<w:insideH w:val="single" w:sz="4"/>
+<w:insideV w:val="single" w:sz="4"/>
+</w:tblBorders>
+</w:tblPr>
+</w:style>
+</w:styles>
+</pkg:xmlData>
+  </pkg:part>
+  <pkg:part pkg:name="/word/_rels/document.xml.rels" pkg:contentType="application/vnd.openxmlformats-package.relationships+xml">
+    <pkg:xmlData>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>
+</pkg:xmlData>
+  </pkg:part>
+</pkg:package>

@@ -3,7 +3,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from UDIS_PyTorch.utils.utilities import resize_image
+from UDIS_PyTorch.utils.image import resize_image
 
 
 def boundary(mask):
@@ -51,22 +51,32 @@ class ReconstructionLoss(nn.Module):
 
 	def forward(self, out, w1, w2, m1, m2):
 		sm1, sm2 = seam_masks(m1, m2)
-		w1l, w2l = resize_image(w1, (self.lrs, self.lrs)), resize_image(w2, (self.lrs, self.lrs))
-		m1l, m2l = resize_image(m1[:, :1], (self.lrs, self.lrs)), resize_image(
-			m2[:, :1], (self.lrs, self.lrs)
+		w1l, w2l = (
+			resize_image(w1, (self.lrs, self.lrs)),
+			resize_image(w2, (self.lrs, self.lrs)),
+		)
+		m1l, m2l = (
+			resize_image(m1[:, :1], (self.lrs, self.lrs)),
+			resize_image(m2[:, :1], (self.lrs, self.lrs)),
 		)
 		s1l, s2l = seam_masks(m1l, m2l)
-		lrs = F.l1_loss(out["lr"] * s1l, w1l * s1l) + F.l1_loss(out["lr"] * s2l, w2l * s2l)
+		lrs = F.l1_loss(out["lr"] * s1l, w1l * s1l) + F.l1_loss(
+			out["lr"] * s2l, w2l * s2l
+		)
 		lrc = self._content(out["lr"], w1l, m1l, "conv5_3") + self._content(
 			out["lr"], w2l, m2l, "conv5_3"
 		)
-		hrs = F.l1_loss(out["hr"] * sm1, w1 * sm1) + F.l1_loss(out["hr"] * sm2, w2 * sm2)
+		hrs = F.l1_loss(out["hr"] * sm1, w1 * sm1) + F.l1_loss(
+			out["hr"] * sm2, w2 * sm2
+		)
 		hrc = self._content(out["hr"], w1, m1[:, :1], "conv3_3") + self._content(
 			out["hr"], w2, m2[:, :1], "conv3_3"
 		)
 		ll = self.sw * lrs + self.cw * lrc
 		hl = self.sw * hrs + self.cw * hrc
-		consistency = F.l1_loss(resize_image(out["hr"], (self.lrs, self.lrs)), out["lr"])
+		consistency = F.l1_loss(
+			resize_image(out["hr"], (self.lrs, self.lrs)), out["lr"]
+		)
 		total = self.lw * ll + self.hw * hl + self.kw * consistency
 		return {
 			"total_loss": total,
