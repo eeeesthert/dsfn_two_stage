@@ -1,6 +1,6 @@
 ## ABUS 二维拼接：离线 manifest 入口
 
-本目录已在原 REW 实现上增加 `run_abus_pairwise.py`，可独立拷贝到服务器或 `vendor_baselines/python-Robust_Elastic_Warping-master/`。入口只调用本目录的 SIFT、HM_ransac、robust TPS 和平均融合，不下载模型或其他实现，无需训练。
+本目录已在原 REW 实现上增加 `run_abus_pairwise.py`，可独立拷贝到服务器或 `vendor_baselines/python-Robust_Elastic_Warping-master/`。入口只调用本目录的 SIFT、单应矩阵 RANSAC、robust TPS 和平均融合，不下载模型或其他实现，无需训练。
 
 先从 ABUS 数据目录生成 manifest（只扫描路径，不读取图像、不运行拼接）：
 
@@ -76,7 +76,7 @@ python eval_metrics.py --pairwise-root ./outputs/baselines/rew --out-csv ./outpu
 python eval_pairwise_no_gt.py --pairwise-root ./outputs/baselines/rew --out-csv ./outputs/rew_no_gt.csv
 ```
 
-本次只修改代码，不运行 ABUS 拼接或评价实验。原代码改动包括：可关闭 GUI、导出 warp 和几何掩膜、保护匹配不足/退化 TPS/超大画布、处理 `r² log(r²)` 在零处的极限和零残差融合。保留 SIFT、原 RANSAC、TPS 正则/网格间隔及平均融合策略。
+本次只修改代码，不运行 ABUS 拼接或评价实验。原代码改动包括：可关闭 GUI、导出 warp 和几何掩膜、保护匹配不足/退化 TPS/超大画布、处理 `r² log(r²)` 在零处的极限和零残差融合。保留 SIFT、TPS 正则/网格间隔及平均融合策略；初始单应矩阵估计选项见下文。
 
 ---
 
@@ -111,3 +111,29 @@ scipy
     </tr>
 </table>
 
+
+## 多数样本报 Unbounded projected canvas 时
+
+该错误表示单应矩阵的投影地平线穿过图像，或某角点靠近无穷远；保留拒绝处理，避免生成无界画布。矩阵检查现改为相对齐次分母判断，相同 H 乘任意非零比例不会改变结论，并检查正反方向。
+
+ABUS 离线入口现在默认 `--homography-estimator opencv`：用 OpenCV RANSAC 和原始图像像素重投影误差替换原自定义 RANSAC 的代数误差评分，再接原 robust TPS。默认阈值 3 像素、最多 10000 次迭代、至少 6 个内点；重估后再次检查内点的实际误差及共线退化。不切换成仿射或其他方法来掩盖失败。
+
+```bash
+python python-Robust_Elastic_Warping-master/run_abus_pairwise.py \
+  --manifest ./outputs/pairs_manifest.csv \
+  --out-dir ./outputs/baselines/rew_pixel_ransac \
+  --homography-estimator opencv \
+  --ransac-reproj-threshold 3 \
+  --ransac-max-iters 10000 \
+  --min-inliers 6
+```
+
+保留 `--homography-estimator legacy --min-inliers 4` 复用旧版 HM_ransac 的 500 次、0.1 代数阈值。像素 RANSAC 是适配版的初始估计器改动，报告实验时须标明该配置，不能与旧估计器结果混为一组。legacy 模式不使用像素阈值和 max-iters 参数，画布有效性检查仍保留。
+
+失败时额外保存 `diagnostics/<stage>/<case>/<prefix>_failure.json`，记录处理阶段、可用的匹配数/内点数、候选 H、图像尺寸、前 200 个内点对应坐标、重投影误差统计和错误原因。若在矩阵估计前失败则没有 H。`rew_outputs.csv` 保留失败时可用的数量，并指向诊断文件；成功元数据和运行配置也记录估计器。真正的错误匹配仍可能失败，本改动不保证真实数据成功率。
+
+代码回归检查（仅数学与日志测试，不运行 ABUS 拼接实验）：
+
+```bash
+python -m pytest -q python-Robust_Elastic_Warping-master/tests/test_homography.py
+```
