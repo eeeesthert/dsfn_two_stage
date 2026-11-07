@@ -2,6 +2,16 @@
 
 本目录已在原 REW 实现上增加 `run_abus_pairwise.py`，可独立拷贝到服务器或 `vendor_baselines/python-Robust_Elastic_Warping-master/`。入口只调用本目录的 SIFT、HM_ransac、robust TPS 和平均融合，不下载模型或其他实现，无需训练。
 
+先从 ABUS 数据目录生成 manifest（只扫描路径，不读取图像、不运行拼接）：
+
+```bash
+python python-Robust_Elastic_Warping-master/prepare_abus_manifest.py \
+  --dataset-root /你的路径/dataset \
+  --out-csv ./outputs/baseline_work/pairs_manifest.csv
+```
+
+支持 `dataset/case001/input1.jpg、input2.jpg、input3.jpg`，以及 `dataset/case001/input1/slice_0001.jpg` 等切片目录。自动生成 stage 12 和 23，优先同名切片；完全不同名且数量相同时按排序配对并提示。单图模式统一 slice 为 `0000`。生成的图像路径为绝对路径。存在 `nipple_x.txt` 时读取其三个坐标；缺少时 `left_x/right_x` 留空，REW 不使用这两个坐标。生成器只依赖 Python 标准库，不需要先安装 OpenCV。目标 CSV 已存在时拒绝覆盖。
+
 安装及调用（以下命令供你在服务器上执行）：
 
 ```bash
