@@ -137,3 +137,42 @@ python python-Robust_Elastic_Warping-master/run_abus_pairwise.py \
 ```bash
 python -m pytest -q python-Robust_Elastic_Warping-master/tests/test_homography.py
 ```
+
+## ABUS 匹配过滤和双向几何验证
+
+针对失败诊断中多个左图点匹配同一右图位置、顶部局部匹配主导 H、四点拟合误差很小但几何不可靠等问题，入口现在默认使用下列配置：
+
+- `--matching-mode robust`：SIFT + 精确 L2 BFMatcher，正反方向都通过 `--sift-ratio 0.7`，再保留互为匹配的对应。按描述子距离从小到大，要求左、右两侧已保留位置均不在 `--dedup-radius-px 1` 半径内，排除多尺度/方向特征的坐标重复。
+- `--feature-mask-mode content --feature-black-threshold 0`：只在非零亮度像素中心提取特征。这只是排除黑背景，不是自动组织分割，不能自动去掉白色文字、标尺。默认不排除任何固定顶部区域或边框，不凭空假定组织区域。
+- `--geometric-validation robust`：用像素阈值同时检查正反向重投影误差；两侧内点凸包面积各需覆盖原图面积至少 `--min-inlier-coverage 0.01`（1%）；继续拒绝投影地平线穿过图像。
+- 在左图 3×3 网格采样 H 的 Jacobian，局部奇异值需处于 `[1/max_local_scale, max_local_scale]`，默认 `--max-local-scale 10`；默认拒绝反射。若数据确实包含镜像，可显式 `--allow-reflection`。网格采样只是异常检测，不保证网格之间的变换性质。
+
+这些默认值是可调的适配策略，不是 ABUS 的生理规律。比如真实重叠很窄时，1% 凸包覆盖要求可能需要调整；`--min-inlier-coverage 0` 可关闭面积门槛。不要单纯为了成功率放宽限制，需检查匹配和拼接质量。加强过滤可能让候选点更少，但不会把不可靠对应当作更多独立内点。
+
+保持默认 robust 配置：
+
+```bash
+python python-Robust_Elastic_Warping-master/run_abus_pairwise.py \
+  --manifest ./outputs/pairs_manifest.csv \
+  --out-dir ./outputs/baselines/rew_robust_matching
+```
+
+如果已经从原图确认顶部有固定标注，可额外设置 `--exclude-top-px N`（N 是实际需排除的原图行数），或用 `--exclude-border-px N` 排除边框。没有预设推荐的固定像素值，避免移除真实组织。上述 mask 仅限制特征中心，SIFT 描述子的邻域仍可能跨出区域；应留出适当间隔。它们不会缩放、裁剪原图，不改变输出的有效区域 mask。
+
+更精确地指定区域：可在原八字段 manifest 后增加可选的 `left_mask,right_mask` 列，分别填写左、右图的二值特征掩膜路径。非零为允许区域，零为排除区域，尺寸必须与对应原图完全一致；相对路径仍以 manifest 目录解析。未填或未提供列时无需外部 mask。外部 mask 与黑背景/顶部/边框限制取交集。生成器仍输出原八字段，可按需添加这两个可选列。
+
+若要复用原始单向 FLANN 匹配、原 HM_ransac 及旧的几何验证口径，显式使用：
+
+```bash
+python python-Robust_Elastic_Warping-master/run_abus_pairwise.py \
+  --manifest ./outputs/pairs_manifest.csv \
+  --out-dir ./outputs/baselines/rew_legacy_matching \
+  --matching-mode legacy --feature-mask-mode none \
+  --homography-estimator legacy --geometric-validation legacy --min-inliers 4
+```
+
+原有数值边界和无界画布保护仍保留。robust 与 legacy 的匹配器、几何过滤口径不同，报告对比实验时应标明设置，不混合汇总。
+
+诊断 JSON 新增：左右关键点数、特征 mask 像素数、正向/反向 ratio 筛选数、互为匹配数、坐标去重后数量、最多 200 对候选坐标、正向检查后数量及双向检查后数量、反向误差、两侧内点凸包覆盖率。过滤早期失败时只记录已完成阶段的数据。运行配置和每对元数据保存匹配与几何参数，失败的 CSV 保留可用匹配数和诊断文件路径。
+
+本次测试仅使用构造的坐标、模拟描述子和日志，不运行 ABUS 拼接或评价实验。未验证真实成功率；如果过滤后仍缺少对应点，应检查区域选择及图像本身的可匹配性，不能据此认定降低阈值即可解决。
