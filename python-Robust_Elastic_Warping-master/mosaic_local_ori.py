@@ -3,6 +3,7 @@ from scipy import linalg
 from scipy.ndimage import map_coordinates
 from utils import unique, plot_matches, cv_draw_matches
 import cv2 as cv
+from homography_geometry import projected_corners
 
 def mosaic_local_ori(im1, im2, H, X1_ok, X2_ok, *, display=False, return_details=False, max_canvas_pixels=8000000):
     imsize1 = im1.shape[:2]
@@ -20,11 +21,12 @@ def mosaic_local_ori(im1, im2, H, X1_ok, X2_ok, *, display=False, return_details
     box2 = np.array([[0, im2.shape[1]-1, im2.shape[1]-1, 0],
                      [0, 0,              im2.shape[0]-1, im2.shape[0]-1],
                      [1, 1,              1,              1]])
-    box2_ = linalg.solve(H, box2)
-    if not np.isfinite(box2_).all() or np.any(np.abs(box2_[2]) < 1e-8) or np.min(box2_[2]) * np.max(box2_[2]) <= 0:
-        raise ValueError("Unbounded projected canvas")
-    box2_[0,:] = box2_[0,:] / box2_[2,:]
-    box2_[1,:] = box2_[1,:] / box2_[2,:]
+    # A homography is defined only up to a nonzero scalar. Test relative
+    # denominators, and reject genuine horizon crossings in either direction.
+    H = np.asarray(H, dtype=float)
+    projected_corners(H, imsize1)
+    H = H / np.max(np.abs(H))
+    box2_ = projected_corners(H, imsize2, inverse=True)
     u0 = min(0, min(box2_[0,:]))
     u1 = max(im1.shape[1]-1, max(box2_[0,:]))
     if not np.isfinite([u0, u1]).all():

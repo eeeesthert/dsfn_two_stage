@@ -64,17 +64,26 @@ def read_manifest(path):
     return rows
 
 
-def align_pair(row, seed, max_canvas_pixels):
+def align_pair(row, seed, max_canvas_pixels, *, estimator="opencv", reproj_threshold=3.0,
+               max_iters=10000, min_inliers=6, diagnostics=None):
+    info = diagnostics if diagnostics is not None else {}
+    info.update(processing_stage="read_images", homography_estimator=estimator)
     images = [cv.imread(row[k], cv.IMREAD_COLOR) for k in ('left', 'right')]
     if any(im is None for im in images):
         raise ValueError('OpenCV could not decode the input pair')
     random.seed(seed)
     cv.setRNGSeed(seed)
+    info.update(left_shape=list(images[0].shape), right_shape=list(images[1].shape), processing_stage='sift')
     x1, x2 = load_data(*images)
-    h, in1, in2 = comp_KR(*images, x1, x2, display=False)
+    info.update(matches=int(x1.shape[1]), processing_stage='homography')
+    h, in1, in2 = comp_KR(*images, x1, x2, display=False, estimator=estimator,
+                         reproj_threshold=reproj_threshold, max_iters=max_iters,
+                         min_inliers=min_inliers, diagnostics=info)
+    info['processing_stage'] = 'canvas_or_tps'
     result = mosaic_local_ori(*images, h, in1, in2, display=False,
                               return_details=True, max_canvas_pixels=max_canvas_pixels)
-    return result, dict(matches=x1.shape[1], inliers=in1.shape[1], H_left_to_right=h.tolist())
+    info['processing_stage'] = 'save_outputs'
+    return result, info
 
 
 def write_image(path, image):
@@ -129,10 +138,16 @@ def main():
     parser.add_argument('--manifest', type=Path, required=True)
     parser.add_argument('--out-dir', type=Path, required=True)
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--homography-estimator', choices=['opencv', 'legacy'], default='opencv')
+    parser.add_argument('--ransac-reproj-threshold', type=float, default=3.0)
+    parser.add_argument('--ransac-max-iters', type=int, default=10000)
+    parser.add_argument('--min-inliers', type=int, default=6)
     parser.add_argument('--max-canvas-pixels', type=int, default=8000000)
     args = parser.parse_args()
     if args.max_canvas_pixels <= 0 or not 0 <= args.seed <= 2147483647:
         parser.error('Canvas limit must be positive; seed must be in [0, 2147483647]')
+    if not np.isfinite(args.ransac_reproj_threshold) or args.ransac_reproj_threshold <= 0 or args.ransac_max_iters < 1 or args.min_inliers < 4:
+        parser.error('RANSAC threshold must be finite and positive, iterations >= 1, min inliers >= 4')
     try:
         rows = read_manifest(args.manifest)
     except (ValueError, OSError) as exc:
@@ -140,6 +155,9 @@ def main():
     # The orchestration layer may create this directory beforehand. Permit it,
     # while preventing stale files for the requested pairs from being evaluated.
     for row in rows:
+        diagnostic = args.out_dir / 'diagnostics' / row['stage'] / row['case'] / f'{row["prefix"]}_failure.json'
+        if diagnostic.exists():
+            parser.error(f'Output already exists: {diagnostic}')
         for path in result_files(args.out_dir, row).values():
             if path.exists():
                 parser.error(f'Output already exists: {path}; use a new --out-dir')
@@ -150,17 +168,25 @@ def main():
     (args.out_dir / 'rew_run_config.json').write_text(json.dumps({
         'manifest': str(args.manifest.resolve()), 'seed': args.seed,
         'max_canvas_pixels': args.max_canvas_pixels,
-        'implementation': 'local SIFT + upstream HM_ransac + robust TPS REW',
+        'implementation': 'local SIFT + configurable homography RANSAC + robust TPS REW',
+        'homography_estimator': args.homography_estimator,
+        'ransac_reproj_threshold_px': args.ransac_reproj_threshold,
+        'ransac_max_iters': args.ransac_max_iters, 'min_inliers': args.min_inliers,
     }, indent=2), encoding='utf8')
     failures = 0
     with (args.out_dir / 'rew_outputs.csv').open('w', newline='', encoding='utf8') as stream:
-        writer = csv.DictWriter(stream, fieldnames=[*REQUIRED, 'status', 'error', 'seconds', 'matches', 'inliers'])
+        writer = csv.DictWriter(stream, fieldnames=[*REQUIRED, 'status', 'error', 'seconds', 'matches', 'inliers', 'homography_estimator', 'diagnostic'])
         writer.writeheader()
         for row in rows:
             start, files = time.perf_counter(), result_files(args.out_dir, row)
-            report = {**row, 'status': 'ok', 'error': ''}
+            report = {**row, 'status': 'ok', 'error': '', 'homography_estimator': args.homography_estimator}
+            info = {}
             try:
-                result, info = align_pair(row, args.seed, args.max_canvas_pixels)
+                result, info = align_pair(row, args.seed, args.max_canvas_pixels,
+                                          estimator=args.homography_estimator,
+                                          reproj_threshold=args.ransac_reproj_threshold,
+                                          max_iters=args.ransac_max_iters,
+                                          min_inliers=args.min_inliers, diagnostics=info)
                 save_result(files, row, result, info)
                 report.update(matches=info['matches'], inliers=info['inliers'])
             except (ValueError, OSError, np.linalg.LinAlgError, cv.error) as exc:
@@ -168,6 +194,13 @@ def main():
                 report.update(status='failed', error=str(exc))
                 for path in files.values():
                     path.unlink(missing_ok=True)
+                diagnostic = args.out_dir / 'diagnostics' / row['stage'] / row['case'] / f'{row["prefix"]}_failure.json'
+                diagnostic.parent.mkdir(parents=True, exist_ok=True)
+                diagnostic.write_text(json.dumps({**row, **info, 'error': str(exc)}, ensure_ascii=False, indent=2), encoding='utf8')
+                report.update(diagnostic=str(diagnostic))
+                for key in ('matches', 'inliers'):
+                    if key in info:
+                        report[key] = info[key]
             report['seconds'] = time.perf_counter() - start
             writer.writerow(report)
             stream.flush()
