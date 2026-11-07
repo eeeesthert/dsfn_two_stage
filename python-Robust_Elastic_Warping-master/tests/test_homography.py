@@ -43,7 +43,7 @@ def test_pixel_ransac_recovers_transform_with_outliers():
     x2 = np.vstack([target.T, np.ones(100)])
     info = {}
     cv.setRNGSeed(0)
-    h, in1, _ = estimator.comp_KR(None,None,x1,x2,display=False,diagnostics=info)
+    h, in1, _ = estimator.comp_KR(np.zeros((600,600),np.uint8),np.zeros((600,600),np.uint8),x1,x2,display=False,diagnostics=info)
     normalized = h / h[2,2]
     np.testing.assert_allclose(normalized[:2,2], [35,-12], atol=.2)
     assert 55 <= in1.shape[1] <= 60
@@ -58,7 +58,7 @@ def test_legacy_option_uses_original_estimator(monkeypatch):
         called.append((n,t))
         return np.eye(3), np.ones(6,dtype=bool), 6
     monkeypatch.setattr(estimator, 'HM_ransac', original)
-    estimator.comp_KR(None,None,points,points,display=False,estimator='legacy')
+    estimator.comp_KR(None,None,points,points,display=False,estimator='legacy',geometric_validation='legacy')
     assert called == [(500,.1)]
 
 
